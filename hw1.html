@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>CS184 HW1 - Rasterizer</title>
+</head>
+<body>
+  <h1>Homework 1: Rasterizer</h1>
+  <p>Yash Shah — CS184 Spring 2026</p>
+
+  <h2>Task 1: Drawing Single-Color Triangles</h2>
+
+  <h3>Implementation</h3>
+  <p>
+    To rasterize a triangle, I first compute its axis-aligned bounding box by taking the minimum and maximum
+    x and y values across the triangle’s three vertices. I then iterate over all pixels within this box and
+    sample at the center of each pixel using (x + 0.5, y + 0.5), as specified in the assignment.
+  </p>
+  <p>
+    For each sample point, I use edge functions to test whether the point lies inside the triangle. If the
+    sample is inside the triangle or on its boundary, I fill the pixel with the triangle’s color using
+    <code>fill_pixel()</code>.
+  </p>
+
+  <h3>Efficiency</h3>
+  <p>
+    My algorithm only checks pixels inside the triangle’s bounding box rather than scanning the entire framebuffer.
+    Each pixel in the bounding box is tested once, so the runtime is proportional to the area of the bounding box.
+    This is no worse than a method that checks every sample in the triangle’s bounding box.
+  </p>
+
+  <h3>Result (basic/test4.svg + Pixel Inspector)</h3>
+  <p>
+    The screenshot below was generated using the GUI <code>S</code> hotkey, with the pixel inspector enabled and centered
+    on an interesting edge region.
+  </p>
+
+  <img src="task1_test4_pixel_inspector.png" width="900" />
+
+</body>
+</html>
