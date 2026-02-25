@@ -155,6 +155,41 @@
   because the aliasing error is less correlated.
   </p>
 
+
+  <hr>
+
+  <h2>Task 3: Transforms</h2>
+
+  <h3>Custom Robot (my_robot.svg)</h3>
+
+  <p>
+  After implementing the <code>translate</code>, <code>scale</code>, and
+  <code>rotate</code> transformation matrices in <code>transforms.cpp</code>,
+  the original <code>robot.svg</code> rendered correctly.
+  To demonstrate hierarchical transformations, I created a modified
+  version of the robot called <code>my_robot.svg</code>.
+  </p>
+
+  <p>
+  I changed the robot’s color and adjusted several group transforms
+  to create a more dynamic pose. The right arm group was rotated
+  (using <code>rotate(-40)</code>) to simulate a waving motion.
+  The left and right leg groups were rotated in opposite directions
+  (<code>rotate(20)</code> and <code>rotate(-20)</code>) to give the appearance
+  of running. I also slightly rotated the head to make the pose
+  feel more expressive.
+  </p>
+
+  <p>
+  Because each limb is defined inside a <code>&lt;g&gt;</code> group,
+  applying a transformation to the group automatically affects
+  all child polygons within that limb. This demonstrates how
+  hierarchical transforms propagate through the SVG transformation
+  stack via matrix multiplication.
+  </p>
+
+  <img src="task3_my_robot.png" width="900" />
+
   
 
 </body>
