@@ -40,5 +40,122 @@
   <h3>Additional Screenshot</h3>
   <img src="task1_test4.png" width="900" />
 
+
+  <hr>
+
+  <h2>Task 2: Antialiasing by Supersampling</h2>
+
+  <h3>Implementation</h3>
+
+  <p>
+  To implement supersampling, I modified the rasterizer to maintain a
+  separate supersample buffer (<code>sample_buffer</code>) that stores
+  <code>sample_rate</code> color samples per pixel instead of a single
+  sample. The buffer size is therefore
+  <code>width × height × sample_rate</code>.
+  </p>
+
+  <p>
+  For triangle rasterization, instead of sampling once at the center
+  of each pixel, I subdivide each pixel into a
+  <code>sqrt(sample_rate) × sqrt(sample_rate)</code> grid of evenly spaced
+  subpixel locations. For each subpixel sample, I perform the same
+  edge-function point-in-triangle test used in Task 1.
+  If the sample lies inside or on the boundary of the triangle,
+  I write the triangle’s color into the corresponding location in
+  the supersample buffer.
+  </p>
+
+  <p>
+  After all primitives are rasterized, I resolve the supersamples
+  into the final framebuffer inside
+  <code>resolve_to_framebuffer()</code>.
+  For each pixel, I average the colors of its
+  <code>sample_rate</code> subpixel samples and write the averaged
+  result into the RGB framebuffer. This averaging step produces
+  partial coverage values near edges, which reduces aliasing artifacts.
+  </p>
+
+  <h3>Performance Considerations</h3>
+
+  <p>
+  The runtime of the rasterizer increases approximately linearly
+  with the sample rate, since each pixel now requires
+  <code>sample_rate</code> coverage tests instead of one.
+  However, rasterization is still restricted to the triangle’s
+  axis-aligned bounding box, so performance remains proportional
+  to the bounding box area rather than the entire framebuffer.
+  </p>
+
+  <h3>Results (basic/test4.svg)</h3>
+
+  <p><strong>Supersample Rate = 1</strong></p>
+  <img src="task2_sr1.png" width="900" />
+
+  <p><strong>Supersample Rate = 4</strong></p>
+  <img src="task2_sr4.png" width="900" />
+
+  <p><strong>Supersample Rate = 16</strong></p>
+  <img src="task2_sr16.png" width="900" />
+
+  <h3>Analysis</h3>
+
+  <p>
+  At a sample rate of 1, triangle edges exhibit visible aliasing
+  (stair-step artifacts), especially along shallow or diagonal edges.
+  This occurs because each pixel is classified as either fully inside
+  or fully outside the triangle.
+  </p>
+
+  <p>
+  At a sample rate of 4, edge transitions become smoother because
+  pixels along boundaries may now have partial coverage. The
+  averaged subpixel samples produce intermediate colors that reduce
+  the stair-step effect.
+  </p>
+
+  <p>
+  At a sample rate of 16, edges appear significantly smoother,
+  with much finer transitions along triangle boundaries.
+  The improvement is especially noticeable along thin or slanted edges,
+  where higher sampling density better approximates the true geometric
+  coverage of the triangle.
+  </p>
+
+  <hr>
+
+  <h3>Extra Credit: Jittered Sampling</h3>
+
+  <p>
+  In addition to regular grid supersampling, I implemented jittered
+  sampling. Instead of placing subpixel samples at fixed grid locations,
+  each sample position is randomly perturbed within its subpixel cell
+  using a deterministic hash-based offset. This keeps sampling stable
+  between frames while introducing randomness in sample placement.
+  </p>
+
+  <p>
+  Grid supersampling reduces aliasing but may introduce structured
+  patterns along certain edges due to the regular alignment of the grid.
+  Jittered sampling breaks this regularity and distributes error more
+  randomly, which reduces visible structured artifacts.
+  </p>
+
+  <p><strong>Grid Sampling (sample rate = 16)</strong></p>
+  <img src="ec_grid_sr16.png" width="900" />
+
+  <p><strong>Jittered Sampling (sample rate = 16)</strong></p>
+  <img src="ec_jitter_sr16.png" width="900" />
+
+  <p>
+  Compared to regular grid sampling, jittered sampling produces
+  less structured stair-step artifacts along diagonal edges.
+  While both methods significantly reduce aliasing compared to
+  sample rate 1, jittered sampling appears visually smoother
+  because the aliasing error is less correlated.
+  </p>
+
+  
+
 </body>
 </html>
