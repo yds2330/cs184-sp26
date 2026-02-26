@@ -365,6 +365,36 @@
   while bilinear sampling improves visual quality by smoothing texture transitions.
   </p>
 
+  <hr>
+
+  <h3>Relationship Between Pixel Sampling and Supersampling</h3>
+
+  <p>
+  It is important to distinguish between pixel sampling and supersampling. 
+  Pixel sampling determines how a texture color is computed from texture coordinates (u, v). 
+  Nearest and bilinear sampling affect how smoothly the texture itself appears.
+  </p>
+
+  <p>
+  Supersampling, on the other hand, reduces aliasing along triangle edges by 
+  taking multiple sub-samples within each pixel and averaging them. Increasing 
+  the supersample rate improves geometric edge smoothness but does not change 
+  how individual texels are filtered.
+  </p>
+
+  <p>
+  Therefore:
+  </p>
+
+  <ul>
+    <li>Nearest vs. bilinear sampling affects texture sharpness and smoothness.</li>
+    <li>1 sample vs. 16 samples per pixel affects triangle edge aliasing.</li>
+  </ul>
+
+  <p>
+  These two techniques address different sources of aliasing in the rendering pipeline.
+  </p>
+
   
 
 </body>
