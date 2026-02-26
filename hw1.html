@@ -397,107 +397,145 @@
 
   <h2>Task 6: Level Sampling with Mipmaps for Texture Mapping</h2>
 
-  <h3>What is level sampling?</h3>
+  <h3>Overview</h3>
   <p>
-  Level sampling decides <em>which resolution</em> of the texture (which mipmap level) to sample from.
-  When a textured surface becomes small on the screen (zooming out), many texels in the original
-  (high-resolution) texture may map into a single screen pixel. If we always sample from level 0,
-  high-frequency details in the texture can cause strong aliasing artifacts such as shimmering,
-  moir&eacute; patterns, and noisy edges.
+  In this task, I implemented level sampling using mipmaps to reduce texture aliasing.
+  When a textured surface becomes small on the screen, many texels from the original
+  high-resolution texture map to a single screen pixel. If we always sample from level 0,
+  high-frequency texture detail causes shimmering and moiré artifacts.
   </p>
 
   <p>
-  Mipmaps solve this by storing prefiltered versions of the texture at decreasing resolutions.
-  Level sampling chooses the appropriate mip level based on how quickly the texture coordinates
-  (u, v) change across the screen.
+  Mipmaps address this by storing prefiltered versions of the texture at progressively
+  lower resolutions. Level sampling determines which mipmap level best matches the
+  pixel footprint on the screen.
   </p>
 
   <hr>
 
-  <h3>Implementation</h3>
+  <h3>Implementation Details</h3>
+
   <p>
-  To compute the mip level, for each sample point inside the triangle I computed the texture
-  coordinates at three screen locations: (x, y), (x+1, y), and (x, y+1). These correspond to
-  <code>sp.p_uv</code>, <code>sp.p_dx_uv</code>, and <code>sp.p_dy_uv</code>. In <code>Texture::get_level</code>,
-  I computed the difference vectors (<code>p_dx_uv - p_uv</code>) and (<code>p_dy_uv - p_uv</code>), scaled them
-  by the width/height of the level-0 texture to convert into texel space, and then used the lecture
-  formula:
+  Inside <code>RasterizerImp::rasterize_textured_triangle</code>, for each sub-sample
+  I computed the UV coordinates at three screen positions:
   </p>
 
   <ul>
-    <li>Compute the magnitude of the UV derivatives in texel space in the x and y directions.</li>
-    <li>Use the maximum of the two magnitudes as the footprint size.</li>
-    <li>Return <code>D = log2(footprint)</code> as the mip level.</li>
+    <li>(x, y)</li>
+    <li>(x + 1, y)</li>
+    <li>(x, y + 1)</li>
   </ul>
 
   <p>
-  Finally, <code>Texture::sample</code> performs level sampling based on <code>lsm</code>:
+  These were stored in <code>sp.p_uv</code>, <code>sp.p_dx_uv</code>, and
+  <code>sp.p_dy_uv</code> respectively and passed into <code>Texture::get_level</code>.
+  </p>
+
+  <p>
+  In <code>get_level</code>, I:
   </p>
 
   <ul>
-    <li><strong>L_ZERO</strong>: always samples mip level 0 (full resolution), same as Task 5.</li>
-    <li><strong>L_NEAREST</strong>: rounds D to the nearest integer mip level and samples that level.</li>
-    <li><strong>L_LINEAR</strong>: linearly interpolates between the two adjacent mip levels
-        (floor(D) and ceil(D)). When combined with bilinear pixel sampling, this becomes
-        <em>trilinear filtering</em>.</li>
+    <li>Computed the UV derivatives: (p_dx_uv − p_uv) and (p_dy_uv − p_uv).</li>
+    <li>Scaled them into texel space using the width and height of mip level 0.</li>
+    <li>Computed their magnitudes.</li>
+    <li>Took the maximum magnitude as the texture footprint.</li>
+    <li>Returned D = log2(footprint) as the mip level.</li>
+  </ul>
+
+  <p>
+  Finally, in <code>Texture::sample</code>, I implemented:
+  </p>
+
+  <ul>
+    <li><strong>L_ZERO</strong>: always sample from mip level 0.</li>
+    <li><strong>L_NEAREST</strong>: round D to the nearest integer mip level.</li>
+    <li><strong>L_LINEAR</strong>: linearly interpolate between floor(D) and ceil(D).
+        When combined with bilinear pixel sampling, this becomes trilinear filtering.</li>
   </ul>
 
   <hr>
 
-  <h3>Tradeoffs: supersampling vs pixel sampling vs level sampling</h3>
-
-  <p>
-  After Task 6, we can independently control three techniques: supersampling, pixel sampling,
-  and level sampling. Each has different tradeoffs:
-  </p>
+  <h3>Tradeoffs Between Sampling Techniques</h3>
 
   <ul>
     <li>
-      <strong>Supersampling (SSAA)</strong> reduces aliasing along triangle edges by taking multiple
-      samples per pixel and averaging them. It is powerful for geometric edges but is expensive
-      because it increases the number of samples stored and computed (more time and memory).
+      <strong>Supersampling</strong> reduces aliasing along triangle edges by taking multiple
+      samples per pixel and averaging them. It significantly improves geometric edge quality,
+      but increases memory usage and runtime proportionally to the sample rate.
     </li>
 
     <li>
-      <strong>Pixel sampling (nearest vs bilinear)</strong> controls how we sample within a single mip level.
-      Nearest sampling is faster but can look blocky. Bilinear sampling is smoother but slightly more expensive
-      and can blur fine details.
+      <strong>Pixel Sampling (Nearest vs Bilinear)</strong> controls how we sample within a
+      selected mip level. Nearest is faster but produces blocky texels. Bilinear interpolates
+      between neighboring texels, producing smoother results at slightly higher cost.
     </li>
 
     <li>
-      <strong>Level sampling (mipmapping)</strong> reduces texture aliasing when zoomed out by sampling from a
-      lower-resolution prefiltered texture. It requires additional memory for storing the mipmap pyramid,
-      but it improves stability and reduces shimmering without needing a very high supersample rate.
+      <strong>Level Sampling (Mipmapping)</strong> reduces texture aliasing when the object
+      is zoomed out by selecting a lower-resolution prefiltered texture. It requires additional
+      memory to store mip levels, but greatly improves visual stability without increasing
+      per-pixel sample count.
     </li>
   </ul>
+
+  <p>
+  Supersampling improves geometric aliasing. Pixel sampling improves intra-texel smoothness.
+  Level sampling improves texture stability at different zoom levels.
+  These techniques address different sources of aliasing and can be combined.
+  </p>
 
   <hr>
 
   <h3>Sampling Comparisons (Using My Own PNG)</h3>
-  <p>
-  Below are four renders of the same textured scene using my own PNG, showing the combinations requested:
-  </p>
 
   <h4>L_ZERO + P_NEAREST</h4>
-  <img src="t6_L0_PN.png" width="600">
-  <p><em>Level 0 with nearest pixel sampling. Aliasing is more visible and texels appear blocky.</em></p>
+  <img src="screenshot_2-25_21-33-58.png" width="600">
+  <p>
+  Sampling from level 0 using nearest pixel sampling produces visible blockiness and
+  more noticeable high-frequency texture noise when zoomed out.
+  </p>
 
   <h4>L_ZERO + P_LINEAR</h4>
-  <img src="t6_L0_PL.png" width="600">
-  <p><em>Level 0 with bilinear pixel sampling. Transitions are smoother, but aliasing can still occur when zoomed out.</em></p>
+  <img src="screenshot_2-25_21-34-44.png" width="600">
+  <p>
+  Using bilinear sampling at level 0 smooths local texel transitions,
+  but aliasing still occurs when the object becomes small because the texture
+  resolution is too high for the pixel footprint.
+  </p>
 
   <h4>L_NEAREST + P_NEAREST</h4>
-  <img src="t6_LN_PN.png" width="600">
-  <p><em>Nearest mip level with nearest pixel sampling. Texture aliasing is reduced compared to L_ZERO.</em></p>
+  <img src="screenshot_2-25_21-35-24.png" width="600">
+  <p>
+  Selecting the nearest mip level reduces aliasing significantly.
+  The texture appears more stable and less noisy when zoomed out.
+  </p>
 
   <h4>L_NEAREST + P_LINEAR</h4>
-  <img src="t6_LN_PL.png" width="600">
-  <p><em>Nearest mip level with bilinear sampling. This generally produces the best balance of stability and smoothness among the four.</em></p>
+  <img src="screenshot_2-25_21-35-34.png" width="600">
+  <p>
+  Combining mip level selection with bilinear pixel sampling produces
+  the smoothest and most stable result among the four configurations.
+  Texture aliasing is reduced while maintaining smooth transitions.
+  </p>
+
+  <hr>
+
+  <h3>Zoomed-Out Stability Comparison</h3>
+
+  <img src="screenshot_2-25_21-37-1.png" width="400">
+  <img src="screenshot_2-25_21-37-32.png" width="400">
 
   <p>
-  Overall, L_NEAREST significantly reduces texture aliasing when the object is zoomed out, because it samples
-  from a mip level whose resolution better matches the pixel footprint on screen. Bilinear pixel sampling further
-  smooths within that chosen mip level.
+  When zoomed out, L_NEAREST produces a more stable and less shimmering
+  appearance compared to L_ZERO. This confirms that mip level computation
+  is correctly adapting to screen-space texture footprint.
+  </p>
+
+  <p>
+  Overall, level sampling with mipmaps improves rendering stability
+  without increasing the supersample rate, making it an efficient
+  solution for reducing texture aliasing.
   </p>
 
   
