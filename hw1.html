@@ -190,6 +190,39 @@
 
   <img src="screenshot_2-24_23-12-33.png" width="900" />
 
+  <hr>
+  <h2>Task 4: Barycentric Coordinates</h2>
+
+  <h3>Explanation</h3>
+  <p>
+  Barycentric coordinates represent any point inside a triangle as a weighted combination
+  of the triangle’s three vertices. For a point P inside a triangle with vertices V0, V1,
+  and V2, we compute three weights (α, β, γ) such that:
+  </p>
+
+  <p>
+  P = αV0 + βV1 + γV2, and α + β + γ = 1.
+  </p>
+
+  <p>
+  Intuitively, each weight measures how close the point is to a vertex. If P is near V0,
+  then α is large; if P lies on the edge opposite V0, then α becomes 0. In our rasterizer,
+  we compute these weights using edge functions (signed area tests). A point is inside the
+  triangle if the weights are all nonnegative (or all nonpositive, depending on winding).
+  </p>
+
+  <p>
+  Once we have (α, β, γ), we can smoothly interpolate any per-vertex quantity across the
+  triangle. For this task, we interpolate color: the final color at P is α·C0 + β·C1 + γ·C2.
+  This produces smooth color gradients instead of flat-colored triangles.
+  </p>
+
+  <h3>Gradient Example (interpolated colors)</h3>
+  <img src="task4_gradient_example.png" width="900" />
+
+  <h3>Color Wheel Result (test7.svg, sample rate 1)</h3>
+  <img src="task4_test7.png" width="900" />
+
   
 
 </body>
