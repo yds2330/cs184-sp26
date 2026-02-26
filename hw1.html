@@ -223,6 +223,148 @@
   <h3>Color Wheel Result (test7.svg, sample rate 1)</h3>
   <img src="screenshot_2-24_23-58-21.png" width="900" />
 
+  <h2>Task 5: Pixel Sampling for Texture Mapping</h2>
+
+  <h3>Overview</h3>
+
+  <p>
+  Pixel sampling determines how we compute the color of a pixel when mapping a texture onto a triangle. 
+  After computing barycentric coordinates for each sub-sample inside a pixel, we interpolate the 
+  corresponding texture coordinates (u, v). These (u, v) coordinates lie in the continuous range [0, 1], 
+  but the texture itself is stored as a discrete grid of texels. Pixel sampling determines how we convert 
+  this continuous texture coordinate into a final color value.
+  </p>
+
+  <p>
+  In this task, I implemented two pixel sampling methods:
+  </p>
+
+  <ul>
+    <li><strong>Nearest neighbor sampling</strong></li>
+    <li><strong>Bilinear interpolation</strong></li>
+  </ul>
+
+  <p>
+  For Task 5, only level 0 of the mipmap (full resolution texture) was used.
+  </p>
+
+  <hr>
+
+  <h3>Implementation Details</h3>
+
+  <p>
+  In <code>rasterize_textured_triangle</code>, I reused the supersampling and barycentric interpolation 
+  logic from Task 4. For each sub-sample inside a pixel:
+  </p>
+
+  <ol>
+    <li>Compute barycentric coordinates.</li>
+    <li>Interpolate texture coordinates (u, v).</li>
+    <li>Use the selected pixel sampling method (psm) to sample the texture at level 0.</li>
+    <li>Store the resulting color in the sample buffer.</li>
+  </ol>
+
+  <p>
+  Nearest sampling converts (u, v) into the closest texel index using rounding. 
+  Bilinear sampling computes a weighted average of the four surrounding texels using linear interpolation 
+  in both the x and y directions.
+  </p>
+
+  <hr>
+
+  <h3>Nearest vs. Bilinear Sampling</h3>
+
+  <h4>Nearest Sampling</h4>
+
+  <p>
+  Nearest neighbor sampling selects the single texel whose center is closest to the 
+  continuous (u, v) coordinate. This method is fast and simple but can produce visible 
+  blockiness and abrupt color transitions.
+  </p>
+
+  <img src="nearest_pixel_sampler.png" width="600">
+  <p><em>Nearest sampling, 1 sample per pixel</em></p>
+
+  <img src="16_pixel_nearest.png" width="600">
+  <p><em>Nearest sampling, 16 samples per pixel</em></p>
+
+  <p>
+  With 1 sample per pixel, the texture appears slightly blocky, especially when zoomed in 
+  around coastlines and grid lines. Increasing to 16 samples per pixel smooths triangle 
+  edges (geometry aliasing), but the texture itself still exhibits blockiness because 
+  nearest sampling does not blend between texels.
+  </p>
+
+  <hr>
+
+  <h4>Bilinear Sampling</h4>
+
+  <p>
+  Bilinear interpolation samples the four surrounding texels and blends them 
+  based on the fractional part of the texture coordinate. This produces smoother 
+  transitions between texels.
+  </p>
+
+  <img src="Bbilinear_1.png" width="600">
+  <p><em>Bilinear sampling, 1 sample per pixel</em></p>
+
+  <img src="bilinear_16.png" width="600">
+  <p><em>Bilinear sampling, 16 samples per pixel</em></p>
+
+  <p>
+  Compared to nearest sampling, bilinear interpolation produces smoother 
+  coastlines and grid lines. The texture transitions appear softer, and 
+  individual texel boundaries are less visible. With 16 samples per pixel, 
+  both texture smoothness and geometric edge smoothness improve further.
+  </p>
+
+  <hr>
+
+  <h3>Pixel Inspector Comparison</h3>
+
+  <p>
+  Using the pixel inspector and zooming into the grid lines on the globe, 
+  the difference between the two methods becomes more apparent.
+  </p>
+
+  <img src="pixel_inspector_normal.png" width="400">
+  <p><em>Nearest sampling (zoomed view)</em></p>
+
+  <img src="pixel_inspector_bilinear.png" width="400">
+  <p><em>Bilinear sampling (zoomed view)</em></p>
+
+  <p>
+  Nearest sampling produces visible square texel blocks and abrupt color changes. 
+  Bilinear sampling blends neighboring texels, producing smoother gradients 
+  and less noticeable pixel boundaries.
+  </p>
+
+  <hr>
+
+  <h3>Discussion: When Is the Difference Large?</h3>
+
+  <p>
+  The difference between nearest and bilinear sampling becomes more significant when:
+  </p>
+
+  <ul>
+    <li>The texture contains high-frequency details (thin lines, sharp edges, text).</li>
+    <li>The texture is magnified (zoomed in).</li>
+    <li>The surface is viewed at an angle.</li>
+  </ul>
+
+  <p>
+  Nearest sampling preserves sharp texel boundaries, which can result in 
+  visible aliasing artifacts. Bilinear sampling reduces these artifacts by 
+  interpolating between texels, creating smoother transitions. However, bilinear 
+  sampling can slightly blur fine details compared to nearest sampling.
+  </p>
+
+  <p>
+  In summary, nearest sampling is faster but produces more aliasing, 
+  while bilinear sampling improves visual quality by smoothing texture transitions.
+  </p>
+
   
 
 </body>
