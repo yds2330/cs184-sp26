@@ -1,0 +1,48 @@
+<h2>Part 1: Bezier Curves with 1D de Casteljau Subdivision</h2>
+
+<h3>Explanation of de Casteljau's Algorithm</h3>
+
+<p>
+de Casteljau's algorithm is a recursive method used to evaluate points on a Bezier curve using linear interpolation between control points. 
+A Bezier curve of degree n is defined by n+1 control points and a parameter t that ranges between 0 and 1. 
+The algorithm works by repeatedly interpolating between consecutive control points until a single point remains.
+</p>
+
+<p>
+Given a set of control points p₁, p₂, ..., pₙ and a parameter t, the algorithm computes intermediate control points using the linear interpolation formula:
+</p>
+
+<p style="text-align:center;">
+p' = (1 − t)pᵢ + t pᵢ₊₁
+</p>
+
+<p>
+This operation generates a new set of n−1 points. The same interpolation process is then applied recursively to these new points, producing smaller and smaller sets of points until only a single point remains. 
+The final point is guaranteed to lie on the Bezier curve at parameter t. 
+This recursive interpolation also visually illustrates how the curve is constructed from the original control points.
+</p>
+h3>Implementation</h3>
+
+<p>
+To implement this algorithm, I completed the function <code>BezierCurve::evaluateStep(...)</code>. 
+This function performs one level of de Casteljau subdivision. It takes the current vector of points and generates a new vector of intermediate points by interpolating between each pair of adjacent points.
+</p>
+
+<p>
+For each pair of points pᵢ and pᵢ₊₁, the function computes the interpolated point using the class member parameter t:
+</p>
+
+<p style="text-align:center;">
+(1 − t)pᵢ + t pᵢ₊₁
+</p>
+
+<p>
+These new interpolated points are stored in a new vector using <code>push_back()</code>. 
+The resulting vector contains one fewer point than the input vector and represents the next level of the de Casteljau subdivision process.
+</p>
+
+<p>
+When visualizing the curve in the meshedit viewer, pressing the <code>E</code> key repeatedly performs successive subdivision steps, showing the intermediate control points at each level. 
+Eventually, a single red point remains, which represents the evaluated point on the Bezier curve. 
+Pressing <code>C</code> toggles the display of the full Bezier curve that is generated from the control points.
+</p>
