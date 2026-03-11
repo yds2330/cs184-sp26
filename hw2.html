@@ -21,7 +21,7 @@ This operation generates a new set of n−1 points. The same interpolation proce
 The final point is guaranteed to lie on the Bezier curve at parameter t. 
 This recursive interpolation also visually illustrates how the curve is constructed from the original control points.
 </p>
-h3>Implementation</h3>
+<h3>Implementation</h3>
 
 <p>
 To implement this algorithm, I completed the function <code>BezierCurve::evaluateStep(...)</code>. 
@@ -46,3 +46,49 @@ When visualizing the curve in the meshedit viewer, pressing the <code>E</code> k
 Eventually, a single red point remains, which represents the evaluated point on the Bezier curve. 
 Pressing <code>C</code> toggles the display of the full Bezier curve that is generated from the control points.
 </p>
+
+<h3>Bezier Curve Evaluation Steps</h3>
+
+<p>
+To demonstrate the algorithm, I created my own Bezier curve using six control points.
+Using the meshedit viewer, I stepped through the evaluation process by repeatedly pressing the <code>E</code> key, which performs one level of de Casteljau subdivision each time.
+The screenshots below show the progression from the original control points to the final evaluated point on the curve.
+</p>
+
+<p><b>Level 0: Original control points</b></p>
+<img src="images/part1_level0.png" width="600">
+
+<p><b>Level 1: First interpolation step</b></p>
+<img src="images/part1_level1.png" width="600">
+
+<p><b>Level 2: Second interpolation step</b></p>
+<img src="images/part1_level2.png" width="600">
+
+<p><b>Level 3: Third interpolation step</b></p>
+<img src="images/part1_level3.png" width="600">
+
+<p><b>Level 4: Fourth interpolation step</b></p>
+<img src="images/part1_level4.png" width="600">
+
+<p><b>Level 5: Final evaluated point on the Bezier curve</b></p>
+<img src="images/part1_level5.png" width="600">
+
+<h3>Completed Bezier Curve</h3>
+
+<p>
+Pressing the <code>C</code> key toggles the visualization of the full Bezier curve generated from the control points.
+The green curve shown below represents the final Bezier curve constructed using the de Casteljau algorithm.
+</p>
+
+<img src="images/part1_curve.png" width="600">
+
+<h3>Modified Bezier Curve</h3>
+
+<p>
+To further test the implementation, I moved several of the original control points by dragging them in the viewer.
+I also modified the parameter <code>t</code> by scrolling on the trackpad.
+Changing the control points alters the shape of the curve, while changing <code>t</code> moves the evaluated point along the curve.
+The screenshot below shows a slightly different Bezier curve produced after modifying both the control points and the parameter value.
+</p>
+
+<img src="images/part1_modified.png" width="600">
