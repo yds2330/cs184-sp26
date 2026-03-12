@@ -167,3 +167,37 @@ each triangle, producing a much smoother appearance across the surface.
 <img src="part3_level1.png" width="600">
 <p><b>Phong shading with area-weighted vertex normals</b></p>
 <img src="part3_level2.png" width="600">
+
+<h2>Part 4: Edge Flip</h2>
+<h3>Implementation</h3>
+<p>
+To implement the edge flip operation, I followed the recommended approach of 
+carefully labeling all mesh elements before and after the flip, then reassigning 
+all pointers explicitly. Given the shared edge (b,c) between two triangles 
+(a,b,c) and (c,b,d), a flip converts it into edge (a,d) connecting the other 
+two vertices, producing new triangles (a,d,c) and (a,b,d).
+</p>
+<p>
+I first collected all existing mesh elements — 10 half-edges, 4 vertices, 
+5 edges, and 2 faces. I then reassigned all pointers for every element in the 
+modified mesh using <code>setNeighbors(...)</code> for each half-edge, even for 
+pointers that did not change. This approach of reassigning everything, rather 
+than only the changed pointers, helped avoid subtle bugs from missed assignments. 
+The function returns immediately without doing anything if the edge is on a 
+boundary.
+</p>
+<h3>Debugging</h3>
+<p>
+I did not encounter any major issues during implementation. The key insight was 
+to reassign all pointers of all elements rather than trying to figure out which 
+ones changed, which kept the implementation clean and correct.
+</p>
+<h3>Results</h3>
+<p>
+The screenshots below show the teapot mesh before and after performing several 
+edge flips. The mesh remains intact with no holes or artifacts after flipping.
+</p>
+<p><b>Before edge flips</b></p>
+<img src="part4_before.png" width="600">
+<p><b>After edge flips</b></p>
+<img src="part4_after.png" width="600">
