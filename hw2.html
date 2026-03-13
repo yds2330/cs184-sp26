@@ -201,3 +201,75 @@ edge flips. The mesh remains intact with no holes or artifacts after flipping.
 <img src="part4_before.png" width="600">
 <p><b>After edge flips</b></p>
 <img src="part4_after.png" width="600">
+
+<h2>Part 5: Edge Split</h2>
+<h3>Implementation</h3>
+<p>
+To implement the edge split operation, I followed the same careful approach as 
+edge flip — labeling all existing mesh elements first, then creating new elements, 
+and finally reassigning all pointers explicitly. Given the shared edge (b,c) 
+between two triangles (a,b,c) and (c,b,d), a split inserts a new vertex m at 
+the midpoint of (b,c) and connects it to vertices a and d, yielding four new 
+triangles: (a,b,m), (m,c,a), (b,d,m), and (d,c,m).
+</p>
+<p>
+I first collected all 10 existing half-edges, 4 vertices, 5 edges, and 2 faces. 
+I then created the new elements needed: 1 new vertex m, 3 new edges, 2 new faces, 
+and 6 new half-edges. The position of the new vertex m was set to the midpoint 
+of the original edge using:
+</p>
+<p style="text-align:center;">
+m.position = (vb.position + vc.position) / 2.0
+</p>
+<p>
+Finally, I used <code>setNeighbors(...)</code> to reassign all pointers for every 
+half-edge in the modified mesh, and explicitly set the halfedge pointers for all 
+vertices, edges, and faces. The new vertex's halfedge was set to point along the 
+original split edge as required by the spec.
+</p>
+
+<h3>Debugging</h3>
+<p>
+The most important trick I used was to reassign all pointers for all elements 
+rather than only the ones that changed. This approach, while more verbose, 
+eliminates an entire class of subtle bugs caused by missed pointer assignments. 
+Drawing out the before and after diagrams on paper and carefully labeling every 
+half-edge, vertex, edge, and face before writing any code was also very helpful 
+in keeping track of all the elements.
+</p>
+
+<h3>Edge Splits</h3>
+<p>
+The screenshots below show the teapot mesh before and after performing several 
+edge splits. Each split inserts a new vertex at the midpoint of the selected 
+edge and subdivides the two neighboring triangles into four.
+</p>
+<p><b>Before edge splits</b></p>
+<img src="part5_before.png" width="600">
+<p><b>After edge splits</b></p>
+<img src="part5_split.png" width="600">
+
+<h3>Edge Splits and Edge Flips Combined</h3>
+<p>
+The screenshot below shows the mesh after performing a combination of both edge 
+splits and edge flips. The mesh remains intact with no holes or artifacts, 
+confirming that both operations work correctly together.
+</p>
+<p><b>Before splits and flips</b></p>
+<img src="part5_before.png" width="600">
+<p><b>After combination of splits and flips</b></p>
+<img src="part5_splitflip.png" width="600">
+
+<h3>Extra Credit: Boundary Edge Splits</h3>
+<p>
+I also implemented support for splitting boundary edges. For a boundary edge, 
+only one neighboring face is an interior triangle — the other is a virtual 
+boundary face. The implementation splits the interior triangle into two new 
+triangles in the same way as a regular split, while also inserting the new 
+vertex into the boundary face by updating the boundary half-edge pointers. 
+This correctly maintains the manifold property of the mesh along the boundary.
+</p>
+<p><b>Before boundary edge split</b></p>
+<img src="part5_boundary_before.png" width="600">
+<p><b>After boundary edge split</b></p>
+<img src="part5_boundary_after.png" width="600">
