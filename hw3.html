@@ -1,1 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CS 184 Homework 3 – PathTracer</title>
+  <style>
+    body {
+      font-family: Georgia, serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      color: #222;
+      line-height: 1.7;
+    }
+    h1 { font-size: 2em; border-bottom: 2px solid #ccc; padding-bottom: 10px; }
+    h2 { font-size: 1.5em; margin-top: 50px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+    h3 { font-size: 1.15em; margin-top: 30px; }
+    p  { margin: 12px 0; }
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+    .image-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .image-grid figure {
+      flex: 1 1 260px;
+      max-width: 420px;
+      margin: 0;
+      text-align: center;
+    }
+    .image-grid img {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    figcaption {
+      font-size: 0.85em;
+      color: #555;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
 
+<h1>CS 184/284A – Homework 3: PathTracer</h1>
+<p><strong>Names:</strong> Yash [Last Name] &amp; Vedant [Last Name]</p>
+<p><strong>Webpage:</strong> <a href="#">[Link to your GitHub Pages site]</a></p>
+
+<!-- ========================================================== -->
+<!--                        OVERVIEW                            -->
+<!-- ========================================================== -->
+<h2>Overview</h2>
+
+<p>
+  In this assignment we built a physically-based path tracer from the ground up.
+  Starting from a blank renderer, we incrementally added every major component of
+  the rendering pipeline: camera ray generation, ray–primitive intersection,
+  a bounding volume hierarchy (BVH) for acceleration, direct and indirect
+  illumination via Monte Carlo integration, and finally adaptive sampling to
+  allocate more samples where the image needs them most.
+</p>
+<p>
+  The end result is a renderer capable of producing photorealistic images with
+  soft shadows, color bleeding, and global illumination effects that rasterization-based
+  pipelines fundamentally cannot replicate. Perhaps the most striking insight from
+  building this is how much physical realism follows naturally from one deceptively
+  simple rule: trace a ray, bounce it off surfaces according to their material
+  properties, and average the results. The complexity lies entirely in making that
+  process efficient enough to be practical — which is where the BVH and adaptive
+  sampling come in.
+</p>
+<p>
+  We also found it illuminating (no pun intended) to see the contribution of each
+  individual bounce of light in isolation. The second and third bounces in particular
+  reveal the indirect color bleeding and soft fill light that make rendered scenes
+  look natural rather than artificially flat — something that is impossible to fake
+  cheaply with rasterization.
+</p>
+
+<!-- ========================================================== -->
+<!--                        PART 1                              -->
+<!-- ========================================================== -->
+<h2>Part 1: Ray Generation and Scene Intersection</h2>
+
+<h3>Ray Generation and the Rendering Pipeline</h3>
+<p>
+  The rendering pipeline begins at the pixel. For each pixel in the output image,
+  we generate one or more camera rays and average their estimated radiance to
+  produce the final color. Concretely, <code>PathTracer::raytrace_pixel(x, y)</code>
+  samples <code>ns_aa</code> random 2D offsets within the pixel using a uniform
+  grid sampler, normalizes each sample to <code>[0,1]²</code> image coordinates,
+  and calls <code>Camera::generate_ray()</code> to produce a world-space ray for
+  each sample. The per-ray radiance estimates are averaged into a Monte Carlo
+  estimate of the pixel's true color.
+</p>
+<p>
+  <code>Camera::generate_ray(x, y)</code> maps normalized image coordinates to a
+  ray in three steps. First, the 2D image coordinate is mapped to a point on the
+  virtual camera sensor, which sits on the <em>z = −1</em> plane in camera space.
+  The sensor spans
+  <code>[−tan(hFov/2), tan(hFov/2)]</code> horizontally and
+  <code>[−tan(vFov/2), tan(vFov/2)]</code> vertically, so the mapping is:
+</p>
+<pre><code>cam_x = (2x − 1) · tan(hFov / 2)
+cam_y = (2y − 1) · tan(vFov / 2)</code></pre>
+<p>
+  This places <code>(0,0)</code> at the sensor's bottom-left and
+  <code>(1,1)</code> at its top-right, consistent with the convention that
+  normalized image coordinates have their origin at the bottom-left.
+  The camera-space ray direction is then <code>(cam_x, cam_y, −1)</code>,
+  normalized. Finally, the direction is rotated into world space using the
+  camera-to-world matrix <code>c2w</code>, and the ray's origin is set to the
+  camera position <code>pos</code>. The ray's <code>min_t</code> and
+  <code>max_t</code> are initialized to <code>nClip</code> and <code>fClip</code>
+  respectively, so only geometry within the viewing frustum is considered.
+</p>
+<p>
+  Once a ray is in the scene, it is tested against every primitive (triangles and
+  spheres) to find the closest intersection. The intersection records the hit
+  distance <code>t</code>, the surface normal, the material (BSDF), and a pointer
+  to the primitive. This information is then used by the lighting routines in later
+  parts to shade the point.
+</p>
+
+<h3>Triangle Intersection: Möller–Trumbore Algorithm</h3>
+<p>
+  We implemented ray–triangle intersection using the Möller–Trumbore algorithm,
+  which solves for the intersection parameter <em>t</em> and the barycentric
+  coordinates <em>(u, v)</em> simultaneously without explicitly computing the
+  plane equation of the triangle.
+</p>
+<p>
+  Given triangle vertices <strong>p1</strong>, <strong>p2</strong>, <strong>p3</strong>
+  and a ray with origin <strong>o</strong> and direction <strong>d</strong>, we
+  define the edge vectors and a helper vector:
+</p>
+<pre><code>e1 = p2 − p1
+e2 = p3 − p1
+s  = o  − p1
+s1 = d  × e2
+s2 = s  × e1</code></pre>
+<p>
+  The algorithm then solves the system in closed form:
+</p>
+<pre><code>[ t ]       1          [ dot(s2, e2) ]
+[ u ] = ———————————  · [ dot(s1, s)  ]
+[ v ]   dot(s1, e1)    [ dot(s2, d)  ]</code></pre>
+<p>
+  The third barycentric coordinate is recovered as <code>w = 1 − u − v</code>.
+  An intersection is valid when all of the following hold:
+</p>
+<ul>
+  <li><code>r.min_t ≤ t ≤ r.max_t</code> (within the ray's active range)</li>
+  <li><code>u ≥ 0, v ≥ 0, w ≥ 0</code> (point lies inside the triangle)</li>
+  <li><code>dot(s1, e1) ≠ 0</code> (ray is not parallel to the triangle plane)</li>
+</ul>
+<p>
+  When a valid intersection is found in <code>Triangle::intersect()</code>, we
+  update <code>r.max_t = t</code> so subsequent intersection tests automatically
+  discard farther hits. The surface normal at the intersection is computed by
+  interpolating the three vertex normals using the barycentric coordinates:
+</p>
+<pre><code>n = u·n1 + v·n2 + w·n3</code></pre>
+<p>
+  This gives smooth per-pixel shading even on coarse meshes.
+</p>
+
+<h3>Sphere Intersection</h3>
+<p>
+  Ray–sphere intersection reduces to solving a quadratic equation. For a sphere
+  centered at <strong>o</strong> with radius <em>r</em> and a ray
+  <strong>p(t) = ray.o + t·ray.d</strong>, substituting into the sphere equation
+  yields:
+</p>
+<pre><code>a = dot(d, d)
+b = −2 · dot(o − ray.o, d)
+c = dot(o − ray.o, o − ray.o) − r²
+
+discriminant = b² − 4ac</code></pre>
+<p>
+  If the discriminant is negative there is no intersection. Otherwise the two
+  roots give two candidate <em>t</em> values; we pick the smaller one that still
+  falls within <code>[min_t, max_t]</code>, falling back to the larger root if the
+  smaller one is out of range. The surface normal at the hit point is simply the
+  normalized vector from the sphere center to the intersection point, which is
+  computed analytically via the built-in <code>normal()</code> helper.
+</p>
+
+<h3>Results: Normal Shading on Small Scenes</h3>
+<p>
+  The images below show several small <code>.dae</code> scenes rendered with
+  normal shading after completing Part 1. Colors encode the surface normal direction
+  at each pixel (R=X, G=Y, B=Z), providing a direct visual check that ray
+  generation and intersection are working correctly.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/part1_CBempty.png" alt="CBempty normal shading" />
+    <figcaption>CBempty.dae – normal shading</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/part1_CBspheres.png" alt="CBspheres normal shading" />
+    <figcaption>CBspheres_lambertian.dae – normal shading</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/part1_banana.png" alt="banana normal shading" />
+    <figcaption>banana.dae – normal shading</figcaption>
+  </figure>
+</div>
+
+</body>
+</html>
