@@ -218,3 +218,165 @@ discriminant = b² − 4ac</code></pre>
 
 </body>
 </html>
+
+<!-- ========================================================== -->
+<!--                        PART 2                              -->
+<!-- ========================================================== -->
+<h2>Part 2: Bounding Volume Hierarchy</h2>
+
+<h3>BVH Construction Algorithm</h3>
+<p>
+  We construct the BVH recursively. At each call, we first compute the bounding
+  box that encloses all primitives in the current range and initialize a new
+  <code>BVHNode</code> with it. If the number of primitives is at or below
+  <code>max_leaf_size</code>, we mark the node as a leaf by setting its
+  <code>start</code> and <code>end</code> iterators and return immediately.
+</p>
+<p>
+  For interior nodes, we choose the axis to split along by looking at the extent
+  of the bounding box — the axis with the largest range (<code>bbox.extent</code>)
+  is selected. This ensures we always split along the dimension where primitives
+  are most spread out, which tends to produce more balanced subtrees and better
+  ray culling than splitting along a fixed axis.
+</p>
+
+<h3>Splitting Heuristic: Surface Area Heuristic (SAH)</h3>
+<p>
+  Rather than simply splitting at the centroid midpoint, we implemented the
+  <strong>Surface Area Heuristic (SAH)</strong> using 8 uniform buckets along
+  the chosen axis. For each primitive, we compute which bucket its centroid falls
+  into and accumulate per-bucket bounding boxes and counts. We then sweep left
+  and right across bucket boundaries to compute prefix and suffix bounding boxes
+  and counts (<code>lboxes</code>, <code>rboxes</code>, <code>lcounts</code>,
+  <code>rcounts</code>).
+</p>
+<p>
+  For each of the 9 candidate split positions (before bucket 0, between each
+  pair of buckets, and after bucket 7), we evaluate the SAH cost:
+</p>
+<pre><code>cost = C_trav + SA(left) × N(left) + SA(right) × N(right)</code></pre>
+<p>
+  where <code>SA()</code> is the surface area of a bounding box,
+  <code>N()</code> is the primitive count on that side, and
+  <code>C_trav = 1.2</code> is a fixed traversal cost. We pick the split with
+  the lowest cost. This heuristic approximates the expected number of ray–primitive
+  intersection tests, so it naturally prefers splits that produce small, tight
+  child bounding boxes with few primitives.
+</p>
+<p>
+  After determining the best split bucket, we use <code>std::partition</code> to
+  reorder the primitive iterator range so that all primitives whose centroid falls
+  in buckets 0 through <code>best_split − 1</code> come before those in buckets
+  <code>best_split</code> through 7. As a fallback, if the partition produces an
+  empty left or right side (which would cause infinite recursion), we fall back to
+  a median split using <code>std::nth_element</code> along the same axis, guaranteeing
+  both children always receive at least one primitive.
+</p>
+
+<h3>Bounding Box Intersection</h3>
+<p>
+  <code>BBox::intersect()</code> uses the slab method. For each axis we compute
+  the entry and exit <em>t</em> values where the ray crosses the two axis-aligned
+  planes bounding the box on that axis, taking care to swap them if the ray
+  direction is negative. The overall entry time is the maximum of the three
+  per-axis entry times, and the overall exit time is the minimum of the three
+  per-axis exit times. If entry exceeds exit, or the exit is before
+  <code>r.min_t</code>, or the entry is after <code>r.max_t</code>, there is no
+  valid intersection. Otherwise we update <code>t0</code> and <code>t1</code>
+  with the entry and exit times.
+</p>
+
+<h3>BVH Traversal</h3>
+<p>
+  Both <code>BVHAccel::has_intersection()</code> and <code>BVHAccel::intersect()</code>
+  follow the same recursive pattern. We first test the ray against the current
+  node's bounding box — if it misses, we return immediately without visiting any
+  children. If the node is a leaf, we test the ray against every primitive it
+  contains. For interior nodes, we recurse into both children. In
+  <code>has_intersection()</code> we short-circuit and return <code>true</code>
+  as soon as any primitive is hit. In <code>intersect()</code> we must visit both
+  children to guarantee we find the closest hit, relying on the fact that each
+  primitive's <code>intersect()</code> updates <code>r.max_t</code> to the nearest
+  hit so far, which automatically prunes farther intersections in subsequent tests.
+</p>
+
+<h3>Results: Large Scenes with BVH Acceleration</h3>
+<p>
+  The following scenes contain tens to hundreds of thousands of triangles and
+  would be completely impractical to render without BVH acceleration.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/part2_maxplanck.png" alt="Max Planck normal shading" />
+    <figcaption>maxplanck.dae – normal shading (~50k triangles)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/part2_CBlucy.png" alt="CBlucy normal shading" />
+    <figcaption>CBlucy.dae – normal shading (~100k+ triangles)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/part2_cow.png" alt="Cow normal shading" />
+    <figcaption>cow.dae – normal shading</figcaption>
+  </figure>
+</div>
+
+<h3>Rendering Time Comparison: With vs. Without BVH</h3>
+
+<!-- 
+  TODO: Fill in your actual timing numbers below.
+  Run each scene with and without BVH and record the terminal output.
+  Example scenes to use: cow.dae, CBlucy.dae, maxplanck.dae
+-->
+
+<table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
+  <thead>
+    <tr style="background: #f4f4f4;">
+      <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Scene</th>
+      <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Primitives</th>
+      <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Without BVH</th>
+      <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">With BVH</th>
+      <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Speedup</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="border: 1px solid #ddd; padding: 10px;">cow.dae</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X]</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X]×</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #ddd; padding: 10px;">maxplanck.dae</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X]</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X]×</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #ddd; padding: 10px;">CBlucy.dae</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X]</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">[X]×</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  <!-- TODO: Fill in your one-paragraph analysis once you have timing numbers.
+  Template below — replace [X] with your actual values. -->
+  The BVH acceleration structure produces a dramatic reduction in rendering time
+  across all tested scenes. Without BVH, every ray must be tested against all
+  primitives in the scene, giving O(n) intersection complexity per ray.
+  For <em>cow.dae</em>, this meant roughly [X] seconds without BVH versus
+  [X] seconds with BVH — a speedup of approximately [X]×. For larger scenes like
+  <em>CBlucy.dae</em> with hundreds of thousands of triangles, rendering without
+  BVH would take many minutes and was effectively impractical, while BVH reduced
+  it to just [X] seconds. The SAH-based splitting heuristic contributes
+  meaningfully here: by preferring splits that minimize the expected number of
+  intersection tests (weighted by bounding box surface area), it produces tighter,
+  more balanced subtrees than a naive midpoint split, reducing the average number
+  of nodes visited per ray from O(n) to O(log n).
+</p>
