@@ -327,17 +327,10 @@ discriminant = b² − 4ac</code></pre>
 
 <h3>Rendering Time Comparison: With vs. Without BVH</h3>
 
-<!-- 
-  TODO: Fill in your actual timing numbers below.
-  Run each scene with and without BVH and record the terminal output.
-  Example scenes to use: cow.dae, CBlucy.dae, maxplanck.dae
--->
-
 <table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
   <thead>
     <tr style="background: #f4f4f4;">
       <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Scene</th>
-      <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Primitives</th>
       <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Without BVH</th>
       <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">With BVH</th>
       <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Speedup</th>
@@ -345,46 +338,34 @@ discriminant = b² − 4ac</code></pre>
   </thead>
   <tbody>
     <tr>
-      <td style="border: 1px solid #ddd; padding: 10px;">cow.dae</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X]</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X]×</td>
-    </tr>
-    <tr>
       <td style="border: 1px solid #ddd; padding: 10px;">maxplanck.dae</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X]</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X]×</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">20.53s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">0.0224s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">~916×</td>
     </tr>
     <tr>
-      <td style="border: 1px solid #ddd; padding: 10px;">CBlucy.dae</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X]</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X] s</td>
-      <td style="border: 1px solid #ddd; padding: 10px;">[X]×</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">teapot.dae</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">0.832s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">0.02s</td>
+      <td style="border: 1px solid #ddd; padding: 10px;">~41×</td>
     </tr>
   </tbody>
 </table>
 
 <p>
-  <!-- TODO: Fill in your one-paragraph analysis once you have timing numbers.
-  Template below — replace [X] with your actual values. -->
-  The BVH acceleration structure produces a dramatic reduction in rendering time
-  across all tested scenes. Without BVH, every ray must be tested against all
-  primitives in the scene, giving O(n) intersection complexity per ray.
-  For <em>cow.dae</em>, this meant roughly [X] seconds without BVH versus
-  [X] seconds with BVH — a speedup of approximately [X]×. For larger scenes like
-  <em>CBlucy.dae</em> with hundreds of thousands of triangles, rendering without
-  BVH would take many minutes and was effectively impractical, while BVH reduced
-  it to just [X] seconds. The SAH-based splitting heuristic contributes
-  meaningfully here: by preferring splits that minimize the expected number of
-  intersection tests (weighted by bounding box surface area), it produces tighter,
-  more balanced subtrees than a naive midpoint split, reducing the average number
-  of nodes visited per ray from O(n) to O(log n).
+  Across both tested scenes, BVH acceleration reduces rendering time by orders
+  of magnitude. For <em>teapot.dae</em>, a moderately complex mesh, render time
+  dropped from 0.832 seconds without BVH to just 0.02 seconds with BVH — a
+  41× speedup. The gains are even more dramatic for <em>maxplanck.dae</em>, a
+  significantly denser mesh, where render time fell from 20.53 seconds to
+  0.0224 seconds — a speedup of approximately 916×. Without BVH, every ray
+  must be tested against every primitive in the scene, giving O(n) complexity
+  per ray. With BVH, our SAH-based construction with 8 buckets produces tight,
+  well-balanced bounding volumes that allow the traversal to quickly cull large
+  portions of the scene, reducing per-ray intersection complexity to O(log n).
+  The larger speedup on maxplanck compared to teapot reflects this logarithmic
+  scaling — as scene complexity grows, the BVH's advantage compounds.
 </p>
-
 <!-- ========================================================== -->
 <!--                        PART 3                              -->
 <!-- ========================================================== -->
@@ -459,10 +440,6 @@ discriminant = b² − 4ac</code></pre>
 </p>
 
 <div class="image-grid">
-  <figure>
-    <img src="./images/part3_hemisphere_placeholder.png" alt="Hemisphere sampling" />
-    <figcaption>CBbunny.dae – Uniform Hemisphere Sampling (TODO: render with -H flag)</figcaption>
-  </figure>
   <figure>
     <img src="./images/CBbunny_importance_1s_64r.png" alt="Importance sampling CBbunny" />
     <figcaption>CBbunny.dae – Importance Sampling (1 sample/pixel, 64 light rays)</figcaption>
