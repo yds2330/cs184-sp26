@@ -530,3 +530,265 @@ discriminant = b² − 4ac</code></pre>
   is more general — but for direct illumination with explicit lights, importance
   sampling is strictly superior in practice.
 </p>
+
+<!-- ========================================================== -->
+<!--                        PART 4                              -->
+<!-- ========================================================== -->
+<h2>Part 4: Global Illumination</h2>
+
+<h3>Implementation of the Indirect Lighting Function</h3>
+<p>
+  Global illumination extends direct lighting by accounting for light that
+  bounces multiple times through the scene before reaching the camera. The core
+  of this is <code>at_least_one_bounce_radiance()</code>, which recursively
+  estimates the contribution of indirect light at each hit point.
+</p>
+<p>
+  When called, the function first computes the one-bounce (direct) radiance at
+  the current hit point via <code>one_bounce_radiance()</code>. It then samples
+  a new incoming direction <code>w_in</code> using <code>bsdf->sample_f()</code>,
+  which draws from a cosine-weighted hemisphere distribution and returns both the
+  sampled direction and its PDF. A new ray is constructed from the hit point in
+  the world-space direction corresponding to <code>w_in</code>, with
+  <code>min_t = EPS_F</code> to avoid self-intersection, and its depth is
+  incremented by 1.
+</p>
+<p>
+  If this new ray intersects the scene, we recursively call
+  <code>at_least_one_bounce_radiance()</code> on the new hit point and accumulate
+  its contribution weighted by the BSDF value, the cosine term
+  <code>|w_in.z|</code>, and divided by the PDF:
+</p>
+<pre><code>L_out += at_least_one_bounce_radiance(new_ray, new_isect)
+         * bsdf->f(w_out, w_in) * fabs(w_in.z) / pdf</code></pre>
+<p>
+  Recursion terminates when <code>r.depth >= max_ray_depth</code>, at which point
+  the function returns black. When <code>isAccumBounces</code> is set to
+  <code>false</code>, we zero out <code>L_out</code> before adding the recursive
+  contribution so that only the light from the <em>exact</em>
+  <code>max_ray_depth</code>-th bounce is returned, rather than the accumulated
+  sum of all bounces up to that depth. This allows us to visualize the isolated
+  contribution of each individual bounce.
+</p>
+<p>
+  Russian Roulette termination is implemented by randomly terminating paths with
+  a fixed probability, making the estimator unbiased while allowing arbitrarily
+  deep paths. The contribution of surviving paths is scaled up by dividing by the
+  continuation probability to compensate for the terminated ones.
+</p>
+
+<h3>Global Illumination Results (1024 Samples/Pixel)</h3>
+<p>
+  The following images were rendered with full global illumination — both direct
+  and indirect light — at 1024 samples per pixel. Notice the realistic color
+  bleeding, soft shadows, and fill light in areas that would be completely black
+  under direct illumination alone.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/bench_global_1024s.png" alt="Bench global illumination" />
+    <figcaption>bench.dae – Global Illumination (1024 samples/pixel)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/blob_global_1024s.png" alt="Blob global illumination" />
+    <figcaption>blob.dae – Global Illumination (1024 samples/pixel)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/walle_global_1024s.png" alt="Wall-E global illumination" />
+    <figcaption>wall-e.dae – Global Illumination (1024 samples/pixel)</figcaption>
+  </figure>
+</div>
+
+<h3>Direct Illumination Only vs. Indirect Illumination Only</h3>
+<p>
+  The images below isolate the direct and indirect components of global
+  illumination on the same scene. Direct illumination only shows hard lighting
+  from the area light with no color bleeding and completely black areas that
+  are not directly lit. Indirect illumination only shows the soft, diffuse light
+  that results purely from light bouncing off surfaces — the ceiling, which is
+  never directly lit, appears bright from indirect bounces, and the colored walls
+  bleed their color onto adjacent surfaces.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/CBspheres_lambertian_directl.png" alt="Direct illumination only" />
+    <figcaption>CBspheres_lambertian.dae – Direct Illumination Only (1024 samples/pixel)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBspheres_lambertian_indirectl.png" alt="Indirect illumination only" />
+    <figcaption>CBspheres_lambertian.dae – Indirect Illumination Only (1024 samples/pixel)</figcaption>
+  </figure>
+</div>
+
+<h3>Unaccumulated Bounces: CBbunny (isAccumBounces=false)</h3>
+<p>
+  The images below show the isolated contribution of each individual bounce of
+  light for CBbunny.dae with <code>isAccumBounces=false</code> and 1024
+  samples per pixel. At m=0 we see only the light source emission (zero bounce).
+  At m=1 we see only direct illumination. The 2nd bounce reveals soft indirect
+  fill light — areas like the underside of the bunny and the ceiling that receive
+  no direct light begin to be illuminated. The 3rd bounce continues this effect,
+  adding subtle color bleeding from the red and blue walls onto the bunny and
+  floor. These indirect bounces are what fundamentally separate path tracing from
+  rasterization: rasterization cannot naturally simulate light bouncing between
+  diffuse surfaces, requiring expensive hacks like ambient occlusion or light maps
+  to approximate these effects. Higher bounces (m=4, m=5) contribute
+  progressively less energy but continue to refine the overall brightness and
+  color of the scene.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/CBbunny_nonaccum_depth0.png" alt="Unaccumulated m=0" />
+    <figcaption>m=0 (zero bounce – light source only)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_nonaccum_depth1.png" alt="Unaccumulated m=1" />
+    <figcaption>m=1 (direct illumination only)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_nonaccum_depth2.png" alt="Unaccumulated m=2" />
+    <figcaption>m=2 (2nd bounce only)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_nonaccum_depth3.png" alt="Unaccumulated m=3" />
+    <figcaption>m=3 (3rd bounce only)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_nonaccum_depth4.png" alt="Unaccumulated m=4" />
+    <figcaption>m=4 (4th bounce only)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_nonaccum_depth5.png" alt="Unaccumulated m=5" />
+    <figcaption>m=5 (5th bounce only)</figcaption>
+  </figure>
+</div>
+
+<h3>Accumulated Bounces: CBbunny (isAccumBounces=true)</h3>
+<p>
+  The images below show the accumulated radiance from all bounces up to depth m
+  for CBbunny.dae with 1024 samples per pixel. At m=0 only the light source is
+  visible. At m=1 direct illumination fills the scene but the ceiling is dark and
+  shadows are harsh. By m=2 the ceiling brightens significantly and indirect fill
+  light softens the overall image. By m=3 and beyond, color bleeding from the
+  walls is clearly visible and the image converges toward the ground truth of full
+  global illumination. The differences between m=4 and m=5 are subtle, showing
+  that most of the visual information is captured within the first 3-4 bounces.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/CBbunny_accum_depth0.png" alt="Accumulated m=0" />
+    <figcaption>m=0 (accumulated)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_accum_depth1.png" alt="Accumulated m=1" />
+    <figcaption>m=1 (accumulated)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_accum_depth2.png" alt="Accumulated m=2" />
+    <figcaption>m=2 (accumulated)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_accum_depth3.png" alt="Accumulated m=3" />
+    <figcaption>m=3 (accumulated)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_accum_depth4.png" alt="Accumulated m=4" />
+    <figcaption>m=4 (accumulated)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_accum_depth5.png" alt="Accumulated m=5" />
+    <figcaption>m=5 (accumulated)</figcaption>
+  </figure>
+</div>
+
+<h3>Russian Roulette Rendering: CBbunny</h3>
+<p>
+  The images below show CBbunny.dae rendered with Russian Roulette termination
+  at various <code>max_ray_depth</code> values using 1024 samples per pixel.
+  Unlike the fixed-depth renders above, Russian Roulette allows paths to
+  probabilistically continue beyond a minimum depth, making the estimator
+  unbiased. At m=0 only the light source is visible. At m=1 direct illumination
+  appears. By m=2 and m=3 the scene progressively brightens with indirect
+  contributions. At m=100 the render has effectively converged to the true global
+  illumination solution, with paths allowed to bounce as many times as needed —
+  the result is indistinguishable from a very high fixed-depth render but computed
+  more efficiently due to early termination of low-contribution paths.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/CBbunny_roulette_depth0.png" alt="Russian Roulette m=0" />
+    <figcaption>Russian Roulette m=0</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_roulette_depth1.png" alt="Russian Roulette m=1" />
+    <figcaption>Russian Roulette m=1</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_roulette_depth2.png" alt="Russian Roulette m=2" />
+    <figcaption>Russian Roulette m=2</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_roulette_depth3.png" alt="Russian Roulette m=3" />
+    <figcaption>Russian Roulette m=3</figcaption>
+  </figure>
+  <figure>
+    <!-- TODO: Ask Vedant to render CBbunny_roulette_depth4.png -->
+    <img src="./images/CBbunny_roulette_depth4.png" alt="Russian Roulette m=4" />
+    <figcaption>Russian Roulette m=4 (TODO: add render)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBbunny_roulette_depth100.png" alt="Russian Roulette m=100" />
+    <figcaption>Russian Roulette m=100</figcaption>
+  </figure>
+</div>
+
+<h3>Sample-Per-Pixel Rate Comparison: CBspheres</h3>
+<p>
+  The images below show CBspheres_lambertian.dae rendered with increasing
+  samples per pixel using 4 light rays and max ray depth 5. At 1 sample per
+  pixel the image is extremely noisy — individual rays produce wildly different
+  radiance estimates and the result is barely recognizable. As sample count
+  increases, the Monte Carlo estimator averages out more samples and the variance
+  drops proportionally. By 64 samples the image looks reasonably clean, and at
+  1024 samples the render has effectively converged to a smooth, noise-free result.
+  This demonstrates the fundamental tradeoff of path tracing: image quality scales
+  with sample count, but so does render time — doubling samples halves variance
+  but doubles cost.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/CBspheres_1s.png" alt="1 sample per pixel" />
+    <figcaption>1 sample/pixel</figcaption>
+  </figure>
+  <figure>
+    <!-- TODO: Ask Vedant to render CBspheres_2s.png -->
+    <img src="./images/CBspheres_2s.png" alt="2 samples per pixel" />
+    <figcaption>2 samples/pixel (TODO: add render)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBspheres_4s.png" alt="4 samples per pixel" />
+    <figcaption>4 samples/pixel</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBspheres_8s.png" alt="8 samples per pixel" />
+    <figcaption>8 samples/pixel</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBspheres_16s.png" alt="16 samples per pixel" />
+    <figcaption>16 samples/pixel</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBspheres_64s.png" alt="64 samples per pixel" />
+    <figcaption>64 samples/pixel</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/CBspheres_1024s.png" alt="1024 samples per pixel" />
+    <figcaption>1024 samples/pixel</figcaption>
+  </figure>
+</div>
