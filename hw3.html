@@ -792,3 +792,93 @@ discriminant = b² − 4ac</code></pre>
     <figcaption>1024 samples/pixel</figcaption>
   </figure>
 </div>
+
+<!-- ========================================================== -->
+<!--                        PART 5                              -->
+<!-- ========================================================== -->
+<h2>Part 5: Adaptive Sampling</h2>
+
+<h3>What is Adaptive Sampling?</h3>
+<p>
+  Uniform sampling allocates the same number of rays to every pixel regardless
+  of how difficult that pixel is to render. Simple regions — like flat walls or
+  areas of uniform color — converge quickly and do not need many samples, while
+  complex regions — like shadow boundaries, edges of objects, or areas with high
+  frequency lighting variation — require many more samples to reduce noise to an
+  acceptable level. Adaptive sampling exploits this by dynamically allocating
+  more samples to pixels that have not yet converged, and stopping early for
+  pixels that have. This gives a much better quality-per-sample tradeoff compared
+  to uniform sampling at the same maximum sample budget.
+</p>
+
+<h3>Implementation</h3>
+<p>
+  Adaptive sampling is implemented directly in <code>PathTracer::raytrace_pixel()</code>.
+  Rather than always taking exactly <code>ns_aa</code> samples, we maintain a
+  running loop that checks for convergence every <code>samplesPerBatch</code>
+  samples. For each sample, we compute its illuminance
+  <code>x_k = radiance.illum()</code> and accumulate two running statistics:
+</p>
+<pre><code>s1 += x_k        // sum of illuminances
+s2 += x_k * x_k  // sum of squared illuminances</code></pre>
+<p>
+  After every <code>samplesPerBatch</code> samples, we compute the mean and
+  variance of all samples taken so far:
+</p>
+<pre><code>mu    = s1 / n
+sigma = sqrt((s2 - s1*s1/n) / (n - 1))</code></pre>
+<p>
+  We then compute the 95% confidence interval half-width:
+</p>
+<pre><code>I = 1.96 * sigma / sqrt(n)</code></pre>
+<p>
+  If <code>I &lt;= maxTolerance * mu</code>, the pixel is considered converged
+  and we stop sampling. Otherwise we continue until we reach the maximum
+  <code>ns_aa</code> samples. The actual number of samples taken is stored in
+  <code>sampleCountBuffer</code>, which is used to generate the sample rate
+  visualization image. The convergence check is only performed every
+  <code>samplesPerBatch</code> samples (default 32) rather than after every
+  single sample, which avoids the overhead of checking too frequently.
+</p>
+<p>
+  The intuition behind the convergence criterion is straightforward: <code>I</code>
+  is small only when the variance of the samples is low or when we have taken
+  enough samples that the estimate is stable. By requiring
+  <code>I &lt;= maxTolerance * mu</code>, we ensure that the confidence interval
+  is tight relative to the mean — i.e., we are 95% confident that the true pixel
+  value lies within a narrow band around our current estimate.
+</p>
+
+<h3>Results</h3>
+<p>
+  The images below show two scenes rendered with adaptive sampling at 2048
+  maximum samples per pixel, 1 sample per light, and max ray depth 5. Each scene
+  shows the rendered result alongside its sample rate image, where blue indicates
+  low sampling rates (pixel converged quickly) and red indicates high sampling
+  rates (pixel required many samples to converge). Notice how simple flat regions
+  like walls and floors are mostly blue, while edges of objects, shadow boundaries,
+  and the area directly under the bunny and spheres are red — exactly where we
+  would expect the most variance.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/bunny_adapa.png" alt="CBbunny adaptive sampling render" />
+    <figcaption>CBbunny.dae – Rendered Result (2048 max samples/pixel, 1 light ray, depth 5)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/bunny_adapa_rate.png" alt="CBbunny adaptive sampling rate" />
+    <figcaption>CBbunny.dae – Sample Rate Image (blue = low, red = high)</figcaption>
+  </figure>
+</div>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/spheres_adapa.png" alt="CBspheres adaptive sampling render" />
+    <figcaption>CBspheres_lambertian.dae – Rendered Result (2048 max samples/pixel, 1 light ray, depth 5)</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/spheres_adapa_rate.png" alt="CBspheres adaptive sampling rate" />
+    <figcaption>CBspheres_lambertian.dae – Sample Rate Image (blue = low, red = high)</figcaption>
+  </figure>
+</div>
