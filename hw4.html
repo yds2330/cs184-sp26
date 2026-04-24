@@ -186,3 +186,123 @@ y = height / (num_height_points - 1) * i</code></pre>
     </figcaption>
   </figure>
 </div>
+<!-- ========================================================== -->
+<!--                        PART 2                              -->
+<!-- ========================================================== -->
+<h2>Part 2: Simulation via Numerical Integration</h2>
+
+<h3>Implementation</h3>
+<p>
+  To simulate the cloth's motion over time, we implemented three steps inside
+  <code>Cloth::simulate()</code> that run on every timestep.
+</p>
+<p>
+  First, we compute the total force acting on each point mass. External forces
+  (like gravity) are computed as <code>F = ma</code> by summing all external
+  accelerations scaled by the point mass's mass, and applied uniformly to every
+  point mass. Spring correction forces are then added using Hooke's law:
+</p>
+<pre><code>F_s = ks * (||p_a - p_b|| - rest_length)</code></pre>
+<p>
+  The force is applied along the vector between the two point masses — equal and
+  opposite on each end. Bending springs are scaled down by a factor of 0.2 since
+  they should exert weaker forces than structural or shearing springs.
+</p>
+<p>
+  Second, we use Verlet integration to update each point mass's position:
+</p>
+<pre><code>x_{t+dt} = x_t + (1 - damping/100) * (x_t - x_{t-dt}) + a_t * dt²</code></pre>
+<p>
+  The damping term slightly scales down the velocity component
+  <code>(x_t - x_{t-dt})</code> to simulate energy loss from friction and heat.
+  Pinned point masses are skipped entirely — their positions never change.
+</p>
+<p>
+  Third, we apply the Provot 1995 deformation constraint. For each spring, if its
+  current length exceeds 110% of its rest length, we correct the positions of its
+  two endpoint masses to bring it back within that limit. The correction is split
+  equally between both masses unless one is pinned, in which case the full
+  correction is applied to the free mass only.
+</p>
+
+<h3>Effect of Spring Constant (ks)</h3>
+<p>
+  The spring constant <code>ks</code> controls how stiff the cloth is. With a very
+  low <code>ks = 500</code>, the springs are weak and the cloth stretches and sags
+  significantly under gravity — the middle of the cloth hangs much lower and the
+  folds are more pronounced and loose. With a very high <code>ks = 50000</code>,
+  the springs are stiff and the cloth barely deforms, hanging much more rigidly
+  and settling into a flatter, tighter rest state with minimal sagging.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/ks_500.png" alt="ks = 500" />
+    <figcaption>ks = 500 — cloth sags heavily, loose and droopy folds</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/ks_50000.png" alt="ks = 50000" />
+    <figcaption>ks = 50000 — cloth is stiff, minimal sagging, tight rest state</figcaption>
+  </figure>
+</div>
+
+<h3>Effect of Density</h3>
+<p>
+  Density controls the mass of each point mass (<code>mass = width * height *
+  density / num_width_points / num_height_points</code>). A low density of
+  <code>1 g/cm²</code> means the cloth is very light — gravity has little effect
+  and the springs easily hold the cloth up, resulting in a flatter, less saggy
+  rest state. A high density of <code>100 g/cm²</code> makes the cloth much
+  heavier, so gravity pulls it down more strongly than the springs can resist,
+  producing deep sagging and more dramatic folds — similar in appearance to
+  lowering <code>ks</code>.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/density_low.png" alt="density = 1" />
+    <figcaption>density = 1 g/cm² — light cloth, minimal sagging</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/density_high.png" alt="density = 100" />
+    <figcaption>density = 100 g/cm² — heavy cloth, pronounced sagging and folds</figcaption>
+  </figure>
+</div>
+
+<h3>Effect of Damping</h3>
+<p>
+  Damping simulates energy loss in the system. With <code>damping = 0%</code>,
+  there is no energy dissipation — the cloth swings back and forth dramatically
+  and takes a very long time to settle, behaving almost like it is in a vacuum.
+  With a higher damping value around <code>1%</code>, the cloth loses energy
+  quickly with each timestep and settles smoothly into its rest state without
+  oscillating. The final resting positions are the same — damping only affects
+  how quickly and smoothly the cloth gets there.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/damping_0.png" alt="damping = 0%" />
+    <figcaption>damping = 0% — cloth swings wildly, slow to settle</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/damping_high.png" alt="damping = 1%" />
+    <figcaption>damping = 1% — cloth settles smoothly and quickly</figcaption>
+  </figure>
+</div>
+
+<h3>Final Resting State: scene/pinned4.json</h3>
+<p>
+  The image below shows the cloth from <code>scene/pinned4.json</code> in its
+  final resting state with default parameters (<code>ks = 5000</code>,
+  <code>density = 15 g/cm²</code>, <code>damping = 0.2%</code>). All four
+  corners are pinned, so the cloth hangs symmetrically and sags in the middle
+  under gravity, settling into a smooth curved surface.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/pinned4_rest.png" alt="pinned4 final resting state" />
+    <figcaption>scene/pinned4.json — final resting state with default parameters</figcaption>
+  </figure>
+</div>
