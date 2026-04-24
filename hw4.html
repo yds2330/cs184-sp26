@@ -395,3 +395,114 @@ y = height / (num_height_points - 1) * i</code></pre>
     <figcaption>scene/plane.json — cloth lying at rest on the plane</figcaption>
   </figure>
 </div>
+
+<!-- ========================================================== -->
+<!--                        PART 4                              -->
+<!-- ========================================================== -->
+<h2>Part 4: Handling Self-Collisions</h2>
+
+<h3>Implementation</h3>
+<p>
+  To handle self-collisions efficiently, we implemented spatial hashing — a technique
+  that partitions 3D space into discrete box volumes and groups point masses by
+  which box they occupy. This avoids the O(n²) cost of checking every pair of point
+  masses against each other, bringing self-collision detection down to a fast
+  per-cell lookup at each timestep.
+</p>
+<p>
+  The implementation consists of three functions. First,
+  <code>Cloth::hash_position()</code> maps a point mass's 3D position to a unique
+  float that identifies its 3D box volume. The box dimensions are set to:
+</p>
+<pre><code>w = 3 * width  / num_width_points
+h = 3 * height / num_height_points
+t = max(w, h)</code></pre>
+<p>
+  The position is truncated to the nearest box by integer division, and a unique
+  hash is computed from the resulting integer coordinates using large prime
+  multipliers to minimize collisions:
+</p>
+<pre><code>hash = fmod(132953 * x, 944689) + fmod(100001 * y, 944689) + fmod(375233 * z, 944689)
+hash = fmod(hash, 10007)</code></pre>
+<p>
+  Second, <code>Cloth::build_spatial_map()</code> iterates over all point masses,
+  hashes each one's position, and inserts a pointer to it into the corresponding
+  bucket in the hash map. This map is rebuilt from scratch at every timestep to
+  reflect the cloth's updated positions.
+</p>
+<p>
+  Third, <code>Cloth::self_collide()</code> takes a point mass, looks up all
+  candidates in its hash bucket, and checks each candidate to see if it is within
+  <code>2 * thickness</code> distance. For each pair that is too close, we compute
+  a correction vector that would push them exactly <code>2 * thickness</code> apart.
+  The final correction applied to the point mass is the average of all pairwise
+  corrections, scaled down by <code>simulation_steps</code> to keep position
+  updates smooth and stable across substeps. Pinned point masses are skipped
+  entirely.
+</p>
+
+<h3>Cloth Falling and Folding on Itself</h3>
+<p>
+  The three images below show the cloth from <code>scene/selfCollision.json</code>
+  at different stages of the simulation. Rather than clipping through itself as it
+  would without self-collision handling, the cloth folds naturally on top of itself,
+  with each layer resting on the one below it.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/self_collision_early.png" alt="Early self-collision" />
+    <figcaption>Early — cloth begins to fold as the bottom hits the plane</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/self_collision_mid.png" alt="Mid self-collision" />
+    <figcaption>Mid — cloth folds on itself, layers building up without clipping</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/self_collision_rest.png" alt="Self-collision at rest" />
+    <figcaption>Rest — cloth settles into a folded pile on the plane</figcaption>
+  </figure>
+</div>
+
+<h3>Effect of Density on Self-Collision</h3>
+<p>
+  Density affects how the cloth folds on itself by changing how strongly gravity
+  pulls the cloth down relative to the spring forces holding it together. With a
+  low density of <code>1 g/cm²</code>, the cloth is very light and the springs
+  dominate — the cloth falls slowly, spreads out more, and produces looser, wider
+  folds with less stacking. With a high density of <code>100 g/cm²</code>, the
+  cloth is heavy and gravity overwhelms the springs — the cloth falls quickly,
+  crumples more aggressively, and stacks into tighter, more compressed folds.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/self_collision_density_low.png" alt="Self-collision low density" />
+    <figcaption>density = 1 g/cm² — light cloth, loose wide folds</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/self_collision_density_high.png" alt="Self-collision high density" />
+    <figcaption>density = 100 g/cm² — heavy cloth, tight compressed folds</figcaption>
+  </figure>
+</div>
+
+<h3>Effect of Spring Constant on Self-Collision</h3>
+<p>
+  The spring constant <code>ks</code> affects the cloth's stiffness during
+  self-collision. With a low <code>ks = 500</code>, the cloth is very soft and
+  flexible — it crumples easily under its own weight and produces many small,
+  irregular folds as it collapses. With a high <code>ks = 50000</code>, the cloth
+  is stiff and resists bending — it falls more rigidly and produces fewer, larger,
+  smoother folds, taking longer to settle and bouncing more before coming to rest.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/self_collision_ks_low.png" alt="Self-collision ks=500" />
+    <figcaption>ks = 500 — soft cloth, many small irregular folds</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/self_collision_ks_high.png" alt="Self-collision ks=50000" />
+    <figcaption>ks = 50000 — stiff cloth, fewer larger smoother folds</figcaption>
+  </figure>
+</div>
