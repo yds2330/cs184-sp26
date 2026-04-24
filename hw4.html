@@ -306,3 +306,92 @@ y = height / (num_height_points - 1) * i</code></pre>
     <figcaption>scene/pinned4.json — final resting state with default parameters</figcaption>
   </figure>
 </div>
+
+<!-- ========================================================== -->
+<!--                        PART 3                              -->
+<!-- ========================================================== -->
+<h2>Part 3: Handling Collisions with Other Objects</h2>
+
+<h3>Sphere Collisions</h3>
+<p>
+  To handle collisions with a sphere, we check on every timestep whether a point
+  mass has moved inside the sphere by comparing the distance from the point mass's
+  current position to the sphere's origin against the sphere's radius. If the
+  distance is less than or equal to the radius, the point mass is inside the sphere
+  and needs to be corrected.
+</p>
+<p>
+  The correction works by computing a tangent point — the point on the sphere's
+  surface along the ray from the origin to the point mass's current position:
+</p>
+<pre><code>tangent = (pm.position - origin).unit() * radius + origin</code></pre>
+<p>
+  We then compute the correction vector needed to bring the point mass from its
+  last position to the tangent point, and scale it down by friction:
+</p>
+<pre><code>pm.position = pm.last_position + (tangent - pm.last_position) * (1 - friction)</code></pre>
+<p>
+  This effectively bumps the point mass back up to the surface of the sphere,
+  while friction slows down its sliding motion along the surface.
+</p>
+
+<h3>Plane Collisions</h3>
+<p>
+  For plane collisions, we detect a crossing by checking whether the point mass
+  has moved from one side of the plane to the other between the last and current
+  timestep. Specifically, we check if both the position relative to the plane and
+  the direction of motion are on the same non-positive side of the plane's normal:
+</p>
+<pre><code>dot(pm.position - point, normal) <= 0 && dot(pm.position - pm.last_position, normal) <= 0</code></pre>
+<p>
+  If a crossing is detected, we compute the tangent point by projecting the
+  current position onto the plane and apply a correction from the last position
+  to that tangent point, again scaled by friction. A small <code>SURFACE_OFFSET</code>
+  of 0.0001 is added to keep the point mass just above the plane's surface and
+  prevent it from clipping through.
+</p>
+
+<h3>Effect of Spring Constant on Sphere Collision</h3>
+<p>
+  The spring constant <code>ks</code> has a noticeable effect on how the cloth
+  drapes over the sphere. With a low <code>ks = 500</code>, the cloth is very
+  soft and conforms tightly to the sphere's surface, draping smoothly with many
+  small folds hanging off the sides. With the default <code>ks = 5000</code>,
+  the cloth drapes naturally with a balance between conforming to the sphere and
+  maintaining some stiffness. With a high <code>ks = 50000</code>, the cloth is
+  very stiff and resists conforming to the sphere — it sits more rigidly on top
+  with larger, less numerous folds and does not wrap as tightly around the sphere's
+  sides.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/sphere_ks500.png" alt="Sphere collision ks=500" />
+    <figcaption>ks = 500 — soft cloth, conforms tightly to sphere with many small folds</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/sphere_ks5000.png" alt="Sphere collision ks=5000" />
+    <figcaption>ks = 5000 — default, natural drape over sphere</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/sphere_ks50000.png" alt="Sphere collision ks=50000" />
+    <figcaption>ks = 50000 — stiff cloth, sits rigidly on sphere with fewer, larger folds</figcaption>
+  </figure>
+</div>
+
+<h3>Cloth at Rest on Plane</h3>
+<p>
+  The image below shows the cloth from <code>scene/plane.json</code> lying at
+  rest on the plane with default parameters. The cloth falls under gravity and
+  comes to a stop just above the plane's surface, held up by the
+  <code>SURFACE_OFFSET</code> to prevent clipping. The plane collision detection
+  correctly prevents any point mass from passing through the plane, resulting in
+  a clean, flat rest state.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/plane_rest.png" alt="Cloth at rest on plane" />
+    <figcaption>scene/plane.json — cloth lying at rest on the plane</figcaption>
+  </figure>
+</div>
