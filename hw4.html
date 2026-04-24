@@ -1,1 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CS 184 Homework 4 – ClothSim</title>
+  <style>
+    body {
+      font-family: Georgia, serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      color: #222;
+      line-height: 1.7;
+    }
+    h1 { font-size: 2em; border-bottom: 2px solid #ccc; padding-bottom: 10px; }
+    h2 { font-size: 1.5em; margin-top: 50px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+    h3 { font-size: 1.15em; margin-top: 30px; }
+    p  { margin: 12px 0; }
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+    .image-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .image-grid figure {
+      flex: 1 1 260px;
+      max-width: 420px;
+      margin: 0;
+      text-align: center;
+    }
+    .image-grid img {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    figcaption {
+      font-size: 0.85em;
+      color: #555;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
 
+<h1>CS 184/284A – Homework 4: ClothSim</h1>
+<p><strong>Names:</strong> Yash Shah &amp; Vedant Jhawar</p>
+<p><strong>Webpage:</strong> <a href="#">https://yds2330.github.io/cs184-sp26/hw4.html</a></p>
+
+<!-- ========================================================== -->
+<!--                        OVERVIEW                            -->
+<!-- ========================================================== -->
+<h2>Overview</h2>
+
+<p>
+  In this assignment, we built a real-time cloth simulator from the ground up
+  using a mass-spring system. The core idea is to represent a piece of cloth as
+  a grid of point masses connected by three types of springs —
+  <strong>structural</strong>, <strong>shearing</strong>, and <strong>bending</strong>
+  — each enforcing different physical constraints that together give the cloth its
+  realistic feel and resistance to deformation.
+</p>
+<p>
+  From there, we implemented Verlet integration to simulate how the cloth moves
+  over time under external forces like gravity, as well as spring correction forces
+  derived from Hooke's law. We also incorporated a position correction step based
+  on the <a href="https://www.cs.rpi.edu/~cutler/classes/advancedgraphics/S14/papers/provot_cloth_simulation_96.pdf">Provot 1995 paper</a>
+  to prevent springs from stretching more than 10% beyond their rest length in a
+  single timestep — a practical constraint that keeps the simulation stable without
+  sacrificing visual realism.
+</p>
+<p>
+  We then handled collisions — first with external objects like a sphere and a
+  plane, and then with the cloth itself. Self-collision was the most algorithmically
+  interesting challenge: a naive O(n²) check of every point mass pair is far too
+  slow for real-time use, so we implemented spatial hashing to bucket point masses
+  into 3D volume cells and only check pairs within the same cell. This brought
+  self-collision detection down to something that runs comfortably within each
+  simulation timestep.
+</p>
+<p>
+  Finally, we wrote GLSL shader programs to render the cloth in real time on the
+  GPU — a sharp contrast to the CPU-bound path tracing we did in Homework 3. We
+  implemented diffuse shading, Blinn-Phong lighting, texture mapping, bump and
+  displacement mapping, and environment-mapped mirror reflections. Each shader
+  required thinking carefully about the vertex and fragment pipeline and how
+  per-vertex data flows through to per-pixel color computations.
+</p>
+<p>
+  One of the most interesting takeaways from this assignment was seeing how much
+  physical realism you can extract from a relatively simple model. Tweaking
+  parameters like the spring constant <code>ks</code>, density, and damping
+  produced dramatically different cloth behaviors — from stiff, barely-moving
+  burlap to loose, flowing silk — all driven by the same underlying equations.
+  Seeing the cloth fold realistically on itself without clipping, purely from
+  physics constraints and spatial hashing, was a particularly satisfying moment.
+</p>
+
+</body>
+</html>
