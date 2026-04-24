@@ -104,3 +104,85 @@
 
 </body>
 </html>
+
+<!-- ========================================================== -->
+<!--                        PART 1                              -->
+<!-- ========================================================== -->
+<h2>Part 1: Masses and Springs</h2>
+
+<h3>Building the Grid</h3>
+<p>
+  The cloth is represented as a <code>num_width_points × num_height_points</code>
+  grid of point masses stored in row-major order. For each grid position
+  <code>(j, i)</code>, we compute its world-space coordinates by evenly spacing
+  points across the cloth's <code>width</code> and <code>height</code> dimensions:
+</p>
+<pre><code>x = width  / (num_width_points  - 1) * j
+y = height / (num_height_points - 1) * i</code></pre>
+<p>
+  The third coordinate depends on the cloth's orientation. For a
+  <code>VERTICAL</code> cloth, we vary positions over the XY plane and assign
+  each point mass a small random offset in Z between −1/1000 and 1/1000 to
+  break the perfect flatness and allow the simulation to develop natural folds.
+  For a <code>HORIZONTAL</code> cloth, we vary positions over the XZ plane and
+  fix Y to 1. Each point mass is also checked against the cloth's
+  <code>pinned</code> vector — if its <code>(x, y)</code> grid index appears
+  there, its <code>pinned</code> flag is set to <code>true</code> so it will
+  not move during simulation.
+</p>
+
+<h3>Adding Springs</h3>
+<p>
+  After all point masses are placed, we make three separate passes over the grid
+  to add springs for each constraint type. In all cases, we use pointer arithmetic
+  into the flat <code>point_masses</code> vector, converting 2D grid indices
+  <code>(row, col)</code> to 1D indices via <code>row * num_width_points + col</code>.
+</p>
+<p>
+  <strong>Structural constraints</strong> connect each point mass to the one
+  directly to its left and the one directly above it. These springs give the cloth
+  its basic grid structure and resist stretching along the cloth's primary axes.
+</p>
+<p>
+  <strong>Shearing constraints</strong> connect each point mass to its diagonal
+  upper-left and diagonal upper-right neighbors. These springs resist shear
+  deformation — the kind of distortion that would occur if opposite corners of
+  the cloth were pulled in opposite directions.
+</p>
+<p>
+  <strong>Bending constraints</strong> connect each point mass to the point mass
+  two steps to its left and two steps above it (skipping the immediate neighbor).
+  These springs are weaker than structural ones (scaled by 0.2 in the force
+  computation) and resist the cloth from bending too sharply out of plane.
+</p>
+
+<h3>Wireframe Screenshots: scene/pinned2.json</h3>
+<p>
+  The three images below show the cloth wireframe from <code>scene/pinned2.json</code>
+  under different spring constraint configurations, illustrating the structural
+  role each spring type plays.
+</p>
+
+<div class="image-grid">
+  <figure>
+    <img src="./images/pinned2_no_shearing.png" alt="Wireframe without shearing constraints" />
+    <figcaption>
+      Without shearing constraints — only structural and bending springs are visible.
+      The grid is purely axis-aligned with no diagonal connections.
+    </figcaption>
+  </figure>
+  <figure>
+    <img src="./images/pinned2_only_shearing.png" alt="Wireframe with only shearing constraints" />
+    <figcaption>
+      With only shearing constraints — only the diagonal springs are visible,
+      forming an X pattern across each grid cell with no horizontal or vertical edges.
+    </figcaption>
+  </figure>
+  <figure>
+    <img src="./images/pinned2_all_constraints.png" alt="Wireframe with all constraints" />
+    <figcaption>
+      With all constraints enabled — structural, shearing, and bending springs
+      together produce the full wireframe with both axis-aligned and diagonal connections.
+    </figcaption>
+  </figure>
+</div>
