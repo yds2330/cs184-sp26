@@ -546,70 +546,65 @@ hash = fmod(hash, 10007)</code></pre>
   There are two types of shaders we worked with. A <strong>vertex shader</strong>
   runs once per vertex and is responsible for transforming per-vertex geometric
   properties — position, normal, UV coordinates, and tangent vectors — from model
-  space into world space and ultimately into screen space. It writes its outputs
-  as <code>varying</code> values that are then interpolated across the triangle's
-  surface using barycentric coordinates before being passed to the fragment shader.
+  space into world space and ultimately into screen space via the model and
+  view-projection matrices. It writes these transformed values as
+  <code>out</code> variables (<code>v_position</code>, <code>v_normal</code>,
+  <code>v_uv</code>, <code>v_tangent</code>) that are then interpolated across
+  the triangle's surface using barycentric coordinates before being passed to
+  the fragment shader.
 </p>
 <p>
   A <strong>fragment shader</strong> runs once per fragment (roughly per pixel)
-  after rasterization. It takes the interpolated per-vertex values from the vertex
-  shader and uses them to compute a final color for that pixel, written into
-  <code>out_color</code>. By combining the geometric information from the vertex
-  shader with light positions, camera position, and textures passed as
-  <code>uniform</code> variables, the fragment shader produces all of the lighting
-  and material effects we see — diffuse shading, specular highlights, texture
-  mapping, bump mapping, and reflections.
+  after rasterization. It receives the interpolated per-vertex values from the
+  vertex shader as <code>in</code> variables, and uses them alongside
+  <code>uniform</code> variables like light position, camera position, and
+  textures to compute a final color written into <code>out_color</code>. Together,
+  the vertex and fragment shaders form a complete shader program — the vertex
+  shader handles geometry, and the fragment shader handles appearance.
 </p>
 
 <h3>Blinn-Phong Shading Model</h3>
 <p>
   The Blinn-Phong shading model approximates how light interacts with a surface
-  by decomposing the total illumination into three components:
-</p>
-<p>
-  The <strong>ambient</strong> component is a constant low-level light that
-  simulates indirect illumination from the environment. It ensures no part of the
-  surface is completely black even if it receives no direct light:
+  by decomposing total illumination into three components. The
+  <strong>ambient</strong> component is a constant low-level light that ensures
+  no surface is completely black even without direct illumination:
 </p>
 <pre><code>L_a = k_a * I_a</code></pre>
 <p>
   The <strong>diffuse</strong> component models light scattered equally in all
-  directions from a rough surface. Its intensity depends on the angle between the
-  surface normal <code>n</code> and the light direction <code>l</code>, following
-  Lambert's cosine law:
+  directions from a matte surface, following Lambert's cosine law:
 </p>
 <pre><code>L_d = k_d * (I / r²) * max(0, dot(n, l))</code></pre>
 <p>
   The <strong>specular</strong> component models the glossy highlight seen on
-  shiny surfaces. Rather than using the reflection vector directly, Blinn-Phong
-  uses the halfway vector <code>h = normalize(v + l)</code> between the view
-  direction and the light direction, which is cheaper to compute and produces
-  a slightly different highlight shape:
+  shiny surfaces using the halfway vector <code>h = normalize(v + l)</code>
+  between the view and light directions:
 </p>
 <pre><code>L_s = k_s * (I / r²) * max(0, dot(n, h))^p</code></pre>
 <p>
-  The exponent <code>p</code> controls the sharpness of the specular highlight —
-  higher values produce a tighter, shinier highlight. In our implementation we
-  used <code>k_a = 0.9</code>, <code>k_d = 0.6</code>, <code>k_s = 0.4</code>,
-  and <code>p = 256</code>.
+  In our implementation we used <code>k_a = 0.9</code>, <code>k_d = 0.6</code>,
+  <code>k_s = 0.4</code>, and <code>p = 256</code>. The high exponent produces
+  a tight, sharp specular highlight. The total output is:
 </p>
+<pre><code>L = k_a * ambient + k_d * diffuse + k_s * specular</code></pre>
 
 <div class="image-grid">
   <figure>
-    <img src="./images/phong_ambient.png" alt="Blinn-Phong ambient only" />
-    <figcaption>Ambient component only — flat, uniform low-level illumination</figcaption>
+    <img src="./images/ambient.png" alt="Blinn-Phong ambient only" />
+    <figcaption>Ambient only (k_a=0.9, k_d=0, k_s=0) — uniform low-level illumination</figcaption>
   </figure>
   <figure>
-    <img src="./images/phong_diffuse.png" alt="Blinn-Phong diffuse only" />
-    <figcaption>Diffuse component only — angle-dependent shading, no highlights</figcaption>
+    <img src="./images/diffuse.png" alt="Blinn-Phong diffuse only" />
+    <figcaption>Diffuse only (k_a=0, k_d=0.6, k_s=0) — angle-dependent shading, no highlights</figcaption>
   </figure>
   <figure>
-    <img src="./images/phong_specular.png" alt="Blinn-Phong specular only" />
-    <figcaption>Specular component only — glossy highlight based on halfway vector</figcaption>
+    <img src="./images/specular.png" alt="Blinn-Phong specular only" />
+    <figcaption>Specular only (k_a=0, k_d=0, k_s=0.4) — tight glossy highlight from halfway vector</figcaption>
   </figure>
   <figure>
-    <img src="./images/phong_full.png" alt="Blinn-Phong full model" />
-    <figcaption>Full Blinn-Phong model — ambient + diffuse + specular combined</figcaption>
+    <img src="./images/phong.png" alt="Blinn-Phong full model" />
+    <figcaption>Full Blinn-Phong (k_a=0.9, k_d=0.6, k_s=0.4, p=256) — all three components combined</figcaption>
   </figure>
 </div>
 
@@ -617,139 +612,158 @@ hash = fmod(hash, 10007)</code></pre>
 <p>
   The texture mapping shader samples a 2D texture at the UV coordinates
   interpolated across each fragment. In <code>Texture.frag</code>, we use the
-  built-in GLSL <code>texture()</code> function to sample <code>u_texture_1</code>
-  at the fragment's UV coordinate <code>v_uv</code> and write the result directly
-  to <code>out_color</code>. The UV coordinates are passed from the vertex shader
-  as a <code>varying</code> and automatically interpolated across the triangle's
-  surface by the rasterizer.
+  built-in GLSL <code>texture()</code> function to sample
+  <code>u_texture_1</code> at the fragment's UV coordinate <code>v_uv</code>
+  and write the result directly to <code>out_color</code>:
+</p>
+<pre><code>out_color = vec4(texture(u_texture_1, v_uv));</code></pre>
+<p>
+  The UV coordinates are passed from the vertex shader as a varying and
+  automatically interpolated across the triangle's surface by the rasterizer.
+  We used <code>texture_4.png</code> — an outdoor scene photograph featuring
+  trees and architecture — as our custom texture.
 </p>
 
 <div class="image-grid">
   <figure>
     <img src="./images/texture_custom.png" alt="Custom texture mapping" />
-    <figcaption>Cloth with custom texture mapping applied</figcaption>
+    <figcaption>Texture mapping using texture_4.png — outdoor scene photograph mapped onto the cloth</figcaption>
   </figure>
 </div>
 
 <h3>Bump Mapping</h3>
 <p>
   Bump mapping creates the illusion of surface detail by perturbing the surface
-  normal at each fragment based on a height map texture, without actually modifying
-  the geometry. We compute how the height changes in the U and V directions using
-  finite differences:
+  normal at each fragment based on a height map texture, without modifying the
+  underlying geometry. We compute how the height changes in the U and V texture
+  directions using finite differences:
 </p>
 <pre><code>dU = (h(u + 1/w, v) - h(u, v)) * k_h * k_n
 dV = (h(u, v + 1/h) - h(u, v)) * k_h * k_n</code></pre>
 <p>
-  where <code>h(u, v)</code> samples the red channel of the height map texture,
-  <code>k_h</code> is the height scaling factor, and <code>k_n</code> is the
-  normal scaling factor. The local object-space normal is then
-  <code>n_o = (-dU, -dV, 1)</code>, which is transformed into world space using
-  the TBN matrix constructed from the tangent <code>t</code>, bitangent
+  where <code>h(u, v)</code> samples the red channel of the height map
+  (<code>texture_4.png</code>), <code>k_h</code> is the height scaling factor
+  (<code>u_height_scaling</code>), and <code>k_n</code> is the normal scaling
+  factor (<code>u_normal_scaling</code>). The local object-space normal is then
+  <code>n_o = (-dU, -dV, 1)</code>, which is transformed into world space
+  using the TBN matrix built from the tangent <code>t</code>, bitangent
   <code>b = normalize(cross(n, t))</code>, and normal <code>n</code>:
 </p>
 <pre><code>TBN = mat3(t, b, n)
 n_d = normalize(TBN * n_o)</code></pre>
 <p>
-  This displaced normal is then used in place of the original surface normal in
-  the Blinn-Phong lighting computation, creating the appearance of bumps and
-  grooves without any change to the underlying mesh geometry.
+  This perturbed normal replaces the original surface normal in the Blinn-Phong
+  lighting computation (<code>k_d=0.8</code>, <code>k_s=0.2</code>,
+  <code>p=256</code>), creating the appearance of bumps and surface texture
+  without any change to the underlying mesh geometry.
 </p>
 
 <div class="image-grid">
   <figure>
-    <img src="./images/bump_cloth.png" alt="Bump mapping on cloth" />
-    <figcaption>Bump mapping on the cloth</figcaption>
+    <img src="./images/cloth_bump.png" alt="Bump mapping on cloth" />
+    <figcaption>Bump mapping on the cloth (texture_4.png, normal=200, height=0.2) — detailed surface texture via normal perturbation</figcaption>
   </figure>
   <figure>
-    <img src="./images/bump_sphere.png" alt="Bump mapping on sphere" />
-    <figcaption>Bump mapping on the sphere</figcaption>
+    <img src="./images/sphere_bump.png" alt="Bump mapping on sphere" />
+    <figcaption>Bump mapping on the sphere (texture_4.png, normal=200, height=0.2) — smooth silhouette preserved</figcaption>
   </figure>
 </div>
 
 <h3>Displacement Mapping</h3>
 <p>
-  Displacement mapping extends bump mapping by actually modifying vertex positions
-  in addition to perturbing normals. In <code>Displacement.vert</code>, each
-  vertex is displaced along its normal direction by an amount proportional to the
-  height map value at its UV coordinate:
+  Displacement mapping extends bump mapping by actually modifying vertex
+  positions in addition to perturbing normals. In
+  <code>Displacement.vert</code>, each vertex is displaced along its normal
+  direction by an amount proportional to the height map value at its UV
+  coordinate:
 </p>
-<pre><code>p' = p + n * h(uv) * k_h</code></pre>
+<pre><code>gl_Position = u_view_projection * u_model *
+  (in_position + h(in_uv) * in_normal * u_height_scaling)</code></pre>
 <p>
   The fragment shader then applies the same normal perturbation as bump mapping
-  to keep the lighting consistent with the new geometry. The result is that
+  to keep shading consistent with the new geometry. Unlike bump mapping,
   displacement mapping produces actual geometric detail that is visible in
-  silhouettes and at grazing angles, unlike bump mapping which only affects
-  shading. However, displacement mapping requires a sufficiently dense mesh to
-  represent the displaced geometry accurately — on a coarse mesh, the
-  displacement appears blocky and jagged.
+  silhouettes and at grazing angles — but requires a sufficiently dense mesh
+  to represent the displaced surface accurately. On a coarse mesh the
+  displacement appears blocky and jagged; on a fine mesh the result is rich
+  geometric detail that closely follows the height map.
 </p>
 
 <div class="image-grid">
   <figure>
-    <img src="./images/displacement_sphere.png" alt="Displacement mapping on sphere" />
-    <figcaption>Displacement mapping on the sphere — actual geometry is modified</figcaption>
+    <img src="./images/cloth_displacement.png" alt="Displacement mapping on cloth" />
+    <figcaption>Displacement mapping on the cloth (texture_4.png, normal=100, height=0.2) — actual vertex positions modified</figcaption>
+  </figure>
+  <figure>
+    <img src="./images/sphere_displacement.png" alt="Displacement mapping on sphere" />
+    <figcaption>Displacement mapping on the sphere (texture_4.png, normal=100, height=0.2) — dramatic geometric deformation visible in silhouette</figcaption>
   </figure>
 </div>
 
 <h3>Bump vs. Displacement: Coarseness Comparison</h3>
 <p>
   The images below compare bump and displacement mapping on the sphere at two
-  different mesh resolutions: coarse (<code>-o 16 -a 16</code>) and fine
-  (<code>-o 128 -a 128</code>). At the coarse resolution, bump mapping still
-  produces smooth-looking shading since it only modifies normals and is
-  independent of mesh density. Displacement mapping at the coarse resolution
-  looks blocky and jagged because there are too few vertices to faithfully
-  represent the displaced surface. At the fine resolution, displacement mapping
-  improves dramatically — the surface detail matches the height map much more
-  closely and the silhouette shows actual geometric variation. Bump mapping
-  looks similar at both resolutions since it is purely a shading effect with
-  no dependence on geometry.
+  mesh resolutions using <code>texture_4.png</code> as the height map. At the
+  coarse resolution (<code>-o 16 -a 16</code>), bump mapping still produces
+  plausible shading since it only modifies normals and is completely independent
+  of mesh density — the sphere silhouette remains perfectly smooth. Displacement
+  mapping at the coarse resolution looks blocky and faceted because there are
+  too few vertices to faithfully represent the displaced surface, resulting in
+  large angular patches rather than fine detail. At the fine resolution
+  (<code>-o 128 -a 128</code>), displacement mapping improves dramatically —
+  the dense mesh can accurately represent the height map and the surface shows
+  rich geometric detail with a clearly bumpy silhouette. Bump mapping looks
+  nearly identical at both resolutions since it is purely a shading effect with
+  no dependence on geometry density — this is the key fundamental difference
+  between the two techniques.
 </p>
 
 <div class="image-grid">
   <figure>
-    <img src="./images/bump_coarse.png" alt="Bump mapping coarse sphere" />
-    <figcaption>Bump mapping — coarse sphere (-o 16 -a 16)</figcaption>
+    <img src="./images/bump_16_16.png" alt="Bump mapping coarse sphere" />
+    <figcaption>Bump mapping — coarse sphere (-o 16 -a 16), smooth silhouette regardless of mesh density</figcaption>
   </figure>
   <figure>
-    <img src="./images/bump_fine.png" alt="Bump mapping fine sphere" />
-    <figcaption>Bump mapping — fine sphere (-o 128 -a 128)</figcaption>
+    <img src="./images/bump_128_128.png" alt="Bump mapping fine sphere" />
+    <figcaption>Bump mapping — fine sphere (-o 128 -a 128), nearly identical to coarse</figcaption>
   </figure>
   <figure>
-    <img src="./images/displacement_coarse.png" alt="Displacement mapping coarse sphere" />
-    <figcaption>Displacement mapping — coarse sphere (-o 16 -a 16), blocky geometry</figcaption>
+    <img src="./images/displacement_16_16.png" alt="Displacement mapping coarse sphere" />
+    <figcaption>Displacement mapping — coarse sphere (-o 16 -a 16), blocky jagged geometry</figcaption>
   </figure>
   <figure>
-    <img src="./images/displacement_fine.png" alt="Displacement mapping fine sphere" />
-    <figcaption>Displacement mapping — fine sphere (-o 128 -a 128), detailed geometry</figcaption>
+    <img src="./images/displacement_128_128.png" alt="Displacement mapping fine sphere" />
+    <figcaption>Displacement mapping — fine sphere (-o 128 -a 128), rich geometric detail matching height map</figcaption>
   </figure>
 </div>
 
 <h3>Mirror Shader</h3>
 <p>
   The mirror shader simulates a perfectly reflective surface using an environment
-  map. For each fragment, we compute the outgoing eye ray direction from the
-  camera position to the fragment's world-space position, then reflect it across
-  the surface normal to get the incoming direction:
+  cubemap. For each fragment, we compute the outgoing eye ray direction from the
+  camera to the fragment's world-space position, then reflect it across the
+  surface normal to get the incoming reflected direction:
 </p>
-<pre><code>w_o = normalize(u_cam_pos - v_position.xyz)
-w_i = reflect(-w_o, normalize(v_normal.xyz))</code></pre>
+<pre><code>vec3 w_o   = normalize(u_cam_pos - v_position.xyz)
+vec3 diff  = w_o - v_normal.xyz
+vec3 w_i   = normalize(v_normal.xyz - diff)</code></pre>
 <p>
-  We then sample the cubemap environment texture in the direction of <code>w_i</code>
-  using the built-in <code>texture(samplerCube, vec3)</code> function. This gives
-  each fragment the color of whatever the environment map shows in the reflected
-  direction, creating the illusion of a mirror surface that reflects the surrounding
-  environment without requiring any additional ray casting.
+  We then sample the cubemap environment texture in the direction of
+  <code>w_i</code> using the built-in <code>texture(samplerCube, vec3)</code>
+  function. This gives each fragment the color of whatever the environment map
+  shows in the reflected direction, creating the illusion of a perfectly mirror
+  surface that reflects the surrounding environment without any additional ray
+  casting. The result is a convincing real-time reflection of the bridge and
+  waterway environment map across the cloth's folds and the sphere's surface.
 </p>
 
 <div class="image-grid">
   <figure>
-    <img src="./images/mirror_cloth.png" alt="Mirror shader on cloth" />
-    <figcaption>Mirror shader on the cloth — environment map reflections</figcaption>
+    <img src="./images/cloth_mirror.png" alt="Mirror shader on cloth" />
+    <figcaption>Mirror shader on the cloth — environment map reflected across draped folds</figcaption>
   </figure>
   <figure>
-    <img src="./images/mirror_sphere.png" alt="Mirror shader on sphere" />
-    <figcaption>Mirror shader on the sphere — environment map reflections</figcaption>
+    <img src="./images/ball_mirror.png" alt="Mirror shader on sphere" />
+    <figcaption>Mirror shader on the sphere — perfect environment map reflection</figcaption>
   </figure>
 </div>
