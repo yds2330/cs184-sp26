@@ -351,40 +351,43 @@ y = height / (num_height_points - 1) * i</code></pre>
   timestep. Specifically, we check if both the position relative to the plane and
   the direction of motion are on the same non-positive side of the plane's normal:
 </p>
-<pre><code>dot(pm.position - point, normal) <= 0 && dot(pm.position - pm.last_position, normal) <= 0</code></pre>
+<pre><code>dot(pm.position - point, normal) &lt;= 0 &amp;&amp;
+dot(pm.position - pm.last_position, normal) &lt;= 0</code></pre>
 <p>
   If a crossing is detected, we compute the tangent point by projecting the
   current position onto the plane and apply a correction from the last position
-  to that tangent point, again scaled by friction. A small <code>SURFACE_OFFSET</code>
-  of 0.0001 is added to keep the point mass just above the plane's surface and
-  prevent it from clipping through.
+  to that tangent point, scaled down by friction. A small <code>SURFACE_OFFSET</code>
+  of 0.0001 keeps the point mass just above the plane's surface to prevent
+  clipping through.
 </p>
 
 <h3>Effect of Spring Constant on Sphere Collision</h3>
 <p>
-  The spring constant <code>ks</code> has a noticeable effect on how the cloth
-  drapes over the sphere. With a low <code>ks = 500</code>, the cloth is very
-  soft and conforms tightly to the sphere's surface, draping smoothly with many
-  small folds hanging off the sides. With the default <code>ks = 5000</code>,
-  the cloth drapes naturally with a balance between conforming to the sphere and
-  maintaining some stiffness. With a high <code>ks = 50000</code>, the cloth is
-  very stiff and resists conforming to the sphere — it sits more rigidly on top
-  with larger, less numerous folds and does not wrap as tightly around the sphere's
-  sides.
+  The spring constant <code>ks</code> has a clear effect on how the cloth drapes
+  over the sphere. With a low <code>ks = 500 N/m</code>, the springs are very
+  weak and the cloth is extremely soft and compliant — it wraps tightly and
+  smoothly around the sphere and falls straight down on all sides, with many fine,
+  thin folds hanging closely together beneath the sphere. With the default
+  <code>ks = 5000 N/m</code>, the cloth drapes naturally, conforming well to the
+  sphere's top surface while producing wider, more evenly spaced folds underneath.
+  With a high <code>ks = 50000 N/m</code>, the cloth is very stiff and resists
+  conforming to the sphere's curvature — it sits more rigidly on top with only a
+  few large, flat folds that extend outward like a tent, barely bending at all
+  beneath the equator of the sphere.
 </p>
 
 <div class="image-grid">
   <figure>
     <img src="./images/sphere_ks500.png" alt="Sphere collision ks=500" />
-    <figcaption>ks = 500 — soft cloth, conforms tightly to sphere with many small folds</figcaption>
+    <figcaption>ks = 500 N/m — very soft cloth, wraps tightly with many thin folds hanging down</figcaption>
   </figure>
   <figure>
     <img src="./images/sphere_ks5000.png" alt="Sphere collision ks=5000" />
-    <figcaption>ks = 5000 — default, natural drape over sphere</figcaption>
+    <figcaption>ks = 5000 N/m — default, natural drape with evenly spaced folds</figcaption>
   </figure>
   <figure>
     <img src="./images/sphere_ks50000.png" alt="Sphere collision ks=50000" />
-    <figcaption>ks = 50000 — stiff cloth, sits rigidly on sphere with fewer, larger folds</figcaption>
+    <figcaption>ks = 50000 N/m — stiff cloth, tent-like shape with only a few large flat folds</figcaption>
   </figure>
 </div>
 
@@ -395,13 +398,13 @@ y = height / (num_height_points - 1) * i</code></pre>
   comes to a stop just above the plane's surface, held up by the
   <code>SURFACE_OFFSET</code> to prevent clipping. The plane collision detection
   correctly prevents any point mass from passing through the plane, resulting in
-  a clean, flat rest state.
+  a clean, flat rest state sitting flush against the plane's surface.
 </p>
 
 <div class="image-grid">
   <figure>
     <img src="./images/plane_rest.png" alt="Cloth at rest on plane" />
-    <figcaption>scene/plane.json — cloth lying at rest on the plane</figcaption>
+    <figcaption>scene/plane.json — cloth lying flat at rest on the plane (default parameters)</figcaption>
   </figure>
 </div>
 
